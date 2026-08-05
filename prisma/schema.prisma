@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+enum ShapeType {
+  RECTANGLE
+  SQUARE
+  TRIANGLE
+  POLYGON
+  CIRCLE
+}
+
+enum SeatStatus {
+  AVAILABLE
+  HELD
+  RESERVED
+  BLOCKED
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  EXPIRED
+  CANCELLED
+}
+
+model Event {
+  id            String        @id @default(uuid())
+  title         String
+  description   String?
+  venueName     String
+  startTime     DateTime
+  endTime       DateTime?
+  viewBoxWidth  Float         @default(1200)
+  viewBoxHeight Float         @default(800)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  layoutId      String?
+  layout        VenueLayout?  @relation(fields: [layoutId], references: [id])
+  sections      Section[]
+  reservations  Reservation[]
+}
+
+model VenueLayout {
+  id           String    @id @default(uuid())
+  name         String
+  canvasWidth  Float     @default(1200)
+  canvasHeight Float     @default(800)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  sections     Section[]
+  events       Event[]
+}
+
+model PricingTier {
+  id        String    @id @default(uuid())
+  name      String
+  color     String
+  basePrice Float
+  sections  Section[]
+  seats     Seat[]
+}
+
+model Section {
+  id            String       @id @default(uuid())
+  layoutId      String?
+  layout        VenueLayout? @relation(fields: [layoutId], references: [id], onDelete: Cascade)
+  eventId       String?
+  event         Event?       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name          String
+  code          String
+  shapeType     ShapeType
+  geometry      String       // JSON stored as string in SQLite
+  pricingTierId String?
+  pricingTier   PricingTier? @relation(fields: [pricingTierId], references: [id], onDelete: SetNull)
+  price         Float        @default(50.00)
+  color         String       @default("#3B82F6")
+  rowCount      Int          @default(10)
+  seatsPerRow   Int          @default(12)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  seats         Seat[]
+}
+
+model Seat {
+  id               String            @id @default(uuid())
+  sectionId        String
+  section          Section           @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  row              String
+  number           Int
+  x                Float
+  y                Float
+  status           SeatStatus        @default(AVAILABLE)
+  priceOverride    Float?
+  pricingTierId    String?
+  pricingTier      PricingTier?      @relation(fields: [pricingTierId], references: [id], onDelete: SetNull)
+  version          Int               @default(1)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  reservationSeats ReservationSeat[]
+
+  @@unique([sectionId, row, number])
+}
+
+model Reservation {
+  id            String            @id @default(uuid())
+  eventId       String
+  event         Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userSessionId String
+  status        ReservationStatus @default(PENDING)
+  totalAmount   Float
+  expiresAt     DateTime
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  seats         ReservationSeat[]
+}
+
+model ReservationSeat {
+  id            String      @id @default(uuid())
+  reservationId String
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  seatId        String
+  seat          Seat        @relation(fields: [seatId], references: [id], onDelete: Cascade)
+  priceLocked   Float
+  createdAt     DateTime    @default(now())
+
+  @@unique([reservationId, seatId])
+}

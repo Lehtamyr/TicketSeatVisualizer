@@ -1,0 +1,260 @@
+'use client';
+
+import React, { useState, useCallback, useRef } from 'react';
+import { SectionDTO, EventDTO } from '@/types/venue';
+import { renderShapePath, calculateBoundingBox, calculateCentroid } from '@/lib/geometry';
+
+interface Tooltip {
+  section: SectionDTO;
+  x: number;
+  y: number;
+}
+
+interface VenueMapCanvasProps {
+  event: EventDTO;
+  onSectionSelect: (section: SectionDTO) => void;
+  selectedSectionId?: string | null;
+}
+
+export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: VenueMapCanvasProps) {
+  const [tooltip, setTooltip] = useState<Tooltip | null>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  const { viewBoxWidth: vbW, viewBoxHeight: vbH, sections } = event;
+
+  const getAvailabilityGrade = (section: SectionDTO) => {
+    if (section.totalSeats === 0) return 0;
+    return section.availableSeats / section.totalSeats;
+  };
+
+  const getSectionOpacity = (section: SectionDTO) => {
+    const grade = getAvailabilityGrade(section);
+    if (grade === 0) return 0.25;
+    if (grade < 0.15) return 0.5;
+    return 0.85;
+  };
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    if (!svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const scaleX = vbW / rect.width;
+    const scaleY = vbH / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+    if (tooltip) {
+      setTooltip((prev) => prev ? { ...prev, x, y } : null);
+    }
+  }, [tooltip, vbW, vbH]);
+
+  const handleSectionMouseEnter = useCallback((section: SectionDTO, e: React.MouseEvent) => {
+    if (!svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const scaleX = vbW / rect.width;
+    const scaleY = vbH / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+    setHoveredId(section.id);
+    setTooltip({ section, x, y });
+  }, [vbW, vbH]);
+
+  const handleSectionMouseLeave = useCallback(() => {
+    setHoveredId(null);
+    setTooltip(null);
+  }, []);
+
+  // Dynamic viewBox zoom calculation based on selectedSectionId
+  let currentViewBox = `0 0 ${vbW} ${vbH}`;
+  if (selectedSectionId) {
+    const selectedSection = sections.find((s) => s.id === selectedSectionId);
+    if (selectedSection) {
+      const pts = selectedSection.geometry.points?.length >= 3
+        ? selectedSection.geometry.points
+        : (selectedSection.geometry.x !== undefined ? [
+            { x: selectedSection.geometry.x, y: selectedSection.geometry.y! },
+            { x: selectedSection.geometry.x + selectedSection.geometry.width!, y: selectedSection.geometry.y! },
+            { x: selectedSection.geometry.x + selectedSection.geometry.width!, y: selectedSection.geometry.y! + selectedSection.geometry.height! },
+            { x: selectedSection.geometry.x, y: selectedSection.geometry.y! + selectedSection.geometry.height! },
+          ] : []);
+
+      if (pts.length >= 3) {
+        const bbox = calculateBoundingBox(pts);
+        const padding = Math.min(bbox.width, bbox.height) * 0.15;
+        const zoomedX = Math.round(Math.max(0, bbox.minX - padding));
+        const zoomedY = Math.round(Math.max(0, bbox.minY - padding));
+        const zoomedW = Math.round(bbox.width + padding * 2);
+        const zoomedH = Math.round(bbox.height + padding * 2);
+        currentViewBox = `${zoomedX} ${zoomedY} ${zoomedW} ${zoomedH}`;
+      }
+    }
+  }
+
+  return (
+    <div className="relative w-full h-full">
+      <svg
+        ref={svgRef}
+        viewBox={currentViewBox}
+        data-testid="venue-svg-map"
+        className="w-full h-full venue-map"
+        style={{ background: 'radial-gradient(ellipse at center, #0f1929 0%, #070a12 100%)', transition: 'viewBox 0.4s ease-in-out' }}
+        onMouseMove={handleMouseMove}
+      >
+        <defs>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
+          </pattern>
+          <filter id="glow-filter">
+            <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+            <feMerge>
+              <feMergeNode in="coloredBlur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+        <rect width={vbW} height={vbH} fill="url(#grid)" />
+
+        {/* Stage */}
+        <rect x={vbW * 0.3} y={vbH * 0.85} width={vbW * 0.4} height={vbH * 0.07}
+          rx="4" fill="rgba(99,102,241,0.15)" stroke="rgba(99,102,241,0.4)" strokeWidth="1" />
+        <text x={vbW * 0.5} y={vbH * 0.895} textAnchor="middle" fill="rgba(99,102,241,0.7)"
+          fontSize="14" fontWeight="600" fontFamily="Inter, sans-serif" letterSpacing="3">
+          STAGE
+        </text>
+
+        {/* Sections */}
+        {sections.map((section) => {
+          const pts = section.geometry.points?.length >= 3
+            ? section.geometry.points
+            : (section.geometry.x !== undefined ? [
+                { x: section.geometry.x, y: section.geometry.y! },
+                { x: section.geometry.x + section.geometry.width!, y: section.geometry.y! },
+                { x: section.geometry.x + section.geometry.width!, y: section.geometry.y! + section.geometry.height! },
+                { x: section.geometry.x, y: section.geometry.y! + section.geometry.height! },
+              ] : []);
+
+          if (pts.length < 3) return null;
+
+          const path = renderShapePath(section.geometry);
+          const centroid = calculateCentroid(pts);
+          const bbox = calculateBoundingBox(pts);
+          const isHovered = hoveredId === section.id;
+          const isSelected = selectedSectionId === section.id;
+          const opacity = getSectionOpacity(section);
+          const grade = getAvailabilityGrade(section);
+
+          const ringColor = grade === 0 ? '#ef4444' : grade < 0.3 ? '#f59e0b' : '#22d3ee';
+
+          return (
+            <g
+              key={section.id}
+              className="venue-section section-group"
+              data-testid="section-shape"
+              onClick={() => onSectionSelect(section)}
+              onMouseEnter={(e) => handleSectionMouseEnter(section, e)}
+              onMouseLeave={handleSectionMouseLeave}
+            >
+              {/* Centroid indicator (drawn behind) */}
+              <circle
+                cx={centroid.x}
+                cy={centroid.y}
+                r={Math.min(bbox.width, bbox.height) * 0.08}
+                fill="rgba(0,0,0,0.5)"
+                stroke={ringColor}
+                strokeWidth="1.5"
+                style={{ pointerEvents: 'none' }}
+              />
+
+              <text
+                x={centroid.x}
+                y={centroid.y - Math.min(bbox.width, bbox.height) * 0.12}
+                textAnchor="middle"
+                fill="#ffffff"
+                fontSize={Math.max(9, Math.min(bbox.width, bbox.height) * 0.08)}
+                fontWeight="700"
+                fontFamily="Inter, sans-serif"
+                style={{ pointerEvents: 'none', userSelect: 'none' }}
+              >
+                {section.code}
+              </text>
+
+              <text
+                x={centroid.x}
+                y={centroid.y + Math.min(bbox.width, bbox.height) * 0.15}
+                textAnchor="middle"
+                fill="rgba(255,255,255,0.65)"
+                fontSize={Math.max(7, Math.min(bbox.width, bbox.height) * 0.065)}
+                fontFamily="Inter, sans-serif"
+                style={{ pointerEvents: 'none', userSelect: 'none' }}
+              >
+                ${section.price}
+              </text>
+
+              {/* Fill Path (drawn on top so Playwright hits this directly without circle intercept errors) */}
+              <path
+                d={path}
+                data-testid={`section-shape-${section.id}`}
+                data-shape={section.shapeType}
+                className={`section-shape ${isHovered ? 'hovered' : ''} ${isSelected ? 'active highlighted' : ''}`}
+                fill={section.color}
+                fillOpacity={isHovered || isSelected ? 0.55 : 0.35}
+                stroke={isSelected ? '#ffffff' : isHovered ? section.color : `${section.color}80`}
+                strokeWidth={isSelected ? 2.5 : isHovered ? 2 : 1}
+                filter={isHovered || isSelected ? 'url(#glow-filter)' : undefined}
+                style={{ transition: 'all 0.2s ease', cursor: 'pointer' }}
+              />
+            </g>
+          );
+        })}
+
+        {/* Tooltip */}
+        {tooltip && (() => {
+          const s = tooltip.section;
+          const tipW = 160;
+          const tipH = 80;
+          const tx = Math.min(tooltip.x + 12, vbW - tipW - 8);
+          const ty = Math.max(tooltip.y - tipH - 12, 8);
+          const grade = getAvailabilityGrade(s);
+          return (
+            <g
+              data-testid="section-tooltip"
+              className="tooltip-venue section-tooltip"
+              style={{ pointerEvents: 'none' }}
+            >
+              <rect x={tx} y={ty} width={tipW} height={tipH} rx="6"
+                fill="rgba(10,13,20,0.95)" stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
+              <text x={tx + 10} y={ty + 20} fill="#f0f4ff" fontSize="11" fontWeight="700" fontFamily="Inter, sans-serif">
+                {s.name}
+              </text>
+              {s.tierName && (
+                <text x={tx + 10} y={ty + 35} fill={s.tierColor ?? '#8892a4'} fontSize="9" fontFamily="Inter, sans-serif">
+                  {s.tierName}
+                </text>
+              )}
+              <text x={tx + 10} y={ty + 50} fill="#8892a4" fontSize="9" fontFamily="Inter, sans-serif">
+                ${s.price.toFixed(2)} per seat
+              </text>
+              <text x={tx + 10} y={ty + 65} fill={grade < 0.2 ? '#ef4444' : '#22d3ee'} fontSize="9" fontFamily="Inter, sans-serif">
+                {s.availableSeats} available
+              </text>
+            </g>
+          );
+        })()}
+      </svg>
+
+      <div className="absolute bottom-3 left-3 flex flex-col gap-1.5 glass rounded-lg p-3 text-xs">
+        <div className="flex items-center gap-2">
+          <div className="legend-dot" style={{ background: '#22d3ee' }} />
+          <span className="text-slate-300">Available</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="legend-dot" style={{ background: '#f59e0b' }} />
+          <span className="text-slate-300">Limited</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="legend-dot" style={{ background: '#ef4444' }} />
+          <span className="text-slate-300">Sold Out</span>
+        </div>
+      </div>
+    </div>
+  );
+}
