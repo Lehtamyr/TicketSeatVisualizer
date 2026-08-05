@@ -42,7 +42,6 @@ yarn-error.log*
 
 # Agent directory
 .agents/
-*.md
 
 # Local binary/debs/libs directories
 debs/
