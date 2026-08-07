@@ -12,14 +12,18 @@ interface SeatGridPickerProps {
 }
 
 export function SeatGridPicker({ section, seats, selectedIds, onToggleSeat }: SeatGridPickerProps) {
-  const pts = section.geometry.points?.length >= 3
-    ? section.geometry.points
-    : (section.geometry.x !== undefined ? [
+  const pts = useMemo(() => {
+    if (section.geometry.points?.length >= 3) return section.geometry.points;
+    if (section.geometry.x !== undefined) {
+      return [
         { x: section.geometry.x, y: section.geometry.y! },
         { x: section.geometry.x + section.geometry.width!, y: section.geometry.y! },
         { x: section.geometry.x + section.geometry.width!, y: section.geometry.y! + section.geometry.height! },
         { x: section.geometry.x, y: section.geometry.y! + section.geometry.height! },
-      ] : []);
+      ];
+    }
+    return [];
+  }, [section.geometry]);
 
   const bbox = useMemo(() => pts.length >= 3 ? calculateBoundingBox(pts) : { minX: 0, minY: 0, maxX: 600, maxY: 400, width: 600, height: 400 }, [pts]);
 

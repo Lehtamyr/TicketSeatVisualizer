@@ -74,8 +74,10 @@ export default function AdminDashboardPage() {
   };
 
   useEffect(() => {
-    fetchLayouts();
-    fetchEvents();
+    const init = async () => {
+      await Promise.all([fetchLayouts(), fetchEvents()]);
+    };
+    init();
   }, []);
 
   const handleDeleteLayout = async (layoutId: string) => {
@@ -194,7 +196,7 @@ export default function AdminDashboardPage() {
             <div className="glass rounded-2xl p-12 text-center text-slate-500 border border-dashed border-white/10">
               <Layers size={36} className="mx-auto mb-3 opacity-20" />
               <p className="text-sm">No layouts built yet</p>
-              <p className="text-xs mt-1">Click "Create New Layout" above to design your first modular seat layout.</p>
+              <p className="text-xs mt-1">Click &quot;Create New Layout&quot; above to design your first modular seat layout.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -268,7 +270,7 @@ export default function AdminDashboardPage() {
             <div className="glass rounded-2xl p-12 text-center text-slate-500 border border-dashed border-white/10">
               <Calendar size={36} className="mx-auto mb-3 opacity-20" />
               <p className="text-sm">No live events active</p>
-              <p className="text-xs mt-1">Use the "Create Event" button next to a layout template to launch one.</p>
+              <p className="text-xs mt-1">Use the &quot;Create Event&quot; button next to a layout template to launch one.</p>
             </div>
           ) : (
             <div className="flex flex-col gap-3">

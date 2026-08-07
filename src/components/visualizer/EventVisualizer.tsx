@@ -18,7 +18,8 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
   const [sessionId, setSessionId] = useState<string>('anonymous');
 
   useEffect(() => {
-    setSessionId(`sess-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`);
+    const id = `sess-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    Promise.resolve().then(() => setSessionId(id));
   }, []);
   const [view, setView] = useState<View>('map');
   const [selectedSection, setSelectedSection] = useState<SectionDTO | null>(null);

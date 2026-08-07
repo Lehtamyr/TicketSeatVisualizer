@@ -120,14 +120,6 @@ export function AdminCanvasWorkspace() {
       .catch((err) => console.error('Failed to load layout:', err));
   }, [layoutIdParam]);
 
-  // Cancel drawing when switching active tool
-  useEffect(() => {
-    setDrawing(false);
-    setPolyPoints([]);
-    setRectStart(null);
-    setRectCurrent(null);
-  }, [tool]);
-
   // Global Escape key (cancel drawing) & Delete/Backspace key (delete selected section) listeners
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -160,7 +152,7 @@ export function AdminCanvasWorkspace() {
   const [tempSeatsPerRow, setTempSeatsPerRow] = useState(12);
 
   const colorIdx = useRef(0);
-  const getNextColor = () => COLORS[colorIdx.current++ % COLORS.length];
+  const getNextColor = useCallback(() => COLORS[colorIdx.current++ % COLORS.length], []);
 
   const getSVGPoint = useCallback((e: React.MouseEvent<any>): Point => {
     if (!svgRef.current) return { x: 0, y: 0 };
@@ -177,6 +169,7 @@ export function AdminCanvasWorkspace() {
     return generateSeatGrid({ geometry, rowCount, seatsPerRow, seatRadius: 7, padding: 14 });
   }, []);
 
+  // Use functional state updates for section creation
   const finalizeSection = useCallback((points: Point[], shapeType: ShapeType) => {
     // Filter out duplicate or near-identical vertices (< 10px apart)
     const uniquePoints: Point[] = [];
@@ -197,23 +190,25 @@ export function AdminCanvasWorkspace() {
     const seatsPerRow = 12;
     const id = `section-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    const newSection: AdminSection = {
-      id,
-      name: `Section ${sections.length + 1}`,
-      code: `S${(sections.length + 1).toString().padStart(2, '0')}`,
-      shapeType,
-      geometry,
-      color: getNextColor(),
-      price: 75,
-      rowCount,
-      seatsPerRow,
-      seats: generateSeats(geometry, rowCount, seatsPerRow),
-      showSeats: true,
-    };
-
-    setSections((prev) => [...prev, newSection]);
+    setSections((prev) => {
+      const count = prev.length + 1;
+      const newSection: AdminSection = {
+        id,
+        name: `Section ${count}`,
+        code: `S${count.toString().padStart(2, '0')}`,
+        shapeType,
+        geometry,
+        color: getNextColor(),
+        price: 75,
+        rowCount,
+        seatsPerRow,
+        seats: generateSeats(geometry, rowCount, seatsPerRow),
+        showSeats: true,
+      };
+      return [...prev, newSection];
+    });
     setSelectedId(id);
-  }, [sections.length, generateSeats]);
+  }, [generateSeats, getNextColor]);
 
   /* ── Mouse handlers ──────────────────────────────────────────────────── */
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
@@ -254,7 +249,7 @@ export function AdminCanvasWorkspace() {
         setSelectedId(null);
       }
     }
-  }, [tool, drawing, getSVGPoint, finalizeSection, sections.length]);
+  }, [tool, drawing, getSVGPoint, finalizeSection]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const pt = getSVGPoint(e);

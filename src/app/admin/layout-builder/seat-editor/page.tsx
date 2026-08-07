@@ -46,13 +46,13 @@ function SeatEditorWorkspace() {
 
   // Load layout data
   useEffect(() => {
-    if (!layoutId) {
-      setError('Missing layoutId parameter');
-      setLoading(false);
-      return;
-    }
-
     const fetchLayout = async () => {
+      if (!layoutId) {
+        setError('Missing layoutId parameter');
+        setLoading(false);
+        return;
+      }
+
       try {
         const response = await fetch(`/api/layouts?layoutId=${layoutId}`);
         if (!response.ok) {

@@ -16,14 +16,14 @@ export default function EventPage() {
 
   useEffect(() => {
     if (!eventId) return;
-    setLoading(true);
-    setError(null);
-    fetch(`/api/events/${eventId}`)
-      .then((res) => {
+    const fetchEvent = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/events/${eventId}`);
         if (!res.ok) throw new Error('Event not found');
-        return res.json();
-      })
-      .then((data) => {
+        const data = await res.json();
+
         // Playwright test intercepts might return:
         // 1. { event: ..., layout: ... }
         // 2. { success: true, data: [event1, event2, ...] }
@@ -46,7 +46,7 @@ export default function EventPage() {
             if (typeof geom === 'string') {
               try {
                 geom = JSON.parse(geom);
-              } catch (e) {
+              } catch {
                 // Keep original
               }
             }
@@ -80,13 +80,13 @@ export default function EventPage() {
           });
         }
         setEvent(rawEvent);
-      })
-      .catch((err) => {
-        setError(err.message);
-      })
-      .finally(() => {
+      } catch (err: any) {
+        setError(err.message || 'Failed to load event');
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+    fetchEvent();
   }, [eventId]);
 
   if (loading) {

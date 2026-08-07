@@ -108,7 +108,7 @@ export function generateSeatGrid(options: SeatGeneratorOptions): GeneratedSeat[]
   const bbox = calculateBoundingBox(polygon);
   const { minX, minY, maxX, maxY, width, height } = bbox;
 
-  if (width <= 0 || height <= 0) {
+  if (width <= 0 || height <= 0 || width < 2 * seatRadius || height < 2 * seatRadius) {
     return [];
   }
 
