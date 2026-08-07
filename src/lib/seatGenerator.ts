@@ -39,6 +39,31 @@ export function getRowLabel(index: number): string {
 }
 
 /**
+ * Calculates the horizontal segment overlap inside a polygon at height y.
+ */
+export function getPolygonHorizontalSpanAtY(y: number, polygon: Point[], pad = 0): { xMin: number; xMax: number } | null {
+  if (!polygon || polygon.length < 3) return null;
+  const intersects: number[] = [];
+  const n = polygon.length;
+  for (let i = 0; i < n; i++) {
+    const p1 = polygon[i];
+    const p2 = polygon[(i + 1) % n];
+    const minY = Math.min(p1.y, p2.y);
+    const maxY = Math.max(p1.y, p2.y);
+    if (y >= minY && y <= maxY && p1.y !== p2.y) {
+      const x = p1.x + ((y - p1.y) * (p2.x - p1.x)) / (p2.y - p1.y);
+      intersects.push(x);
+    }
+  }
+  if (intersects.length < 2) return null;
+  intersects.sort((a, b) => a - b);
+  return {
+    xMin: intersects[0] + pad,
+    xMax: intersects[intersects.length - 1] - pad,
+  };
+}
+
+/**
  * Generates seat grid inside an arbitrary polygon boundary.
  * Guarantees 100% of returned seats lie strictly inside the polygon using PIP circle validation.
  */
@@ -99,46 +124,61 @@ export function generateSeatGrid(options: SeatGeneratorOptions): GeneratedSeat[]
   const endY = maxY - pad;
 
   const rowStep = rowCount > 1 ? (endY - startY) / (rowCount - 1) : 0;
-  const seatStep = seatsPerRow > 1 ? (endX - startX) / (seatsPerRow - 1) : 0;
-
   const seats: GeneratedSeat[] = [];
-  let activeRowIndex = 0;
+
+  const rowConfigs = options.geometry?.rowConfigs || [];
+  const clipToBoundary = options.geometry?.clipToBoundary !== false;
+  const disabledSeats = options.geometry?.disabledSeats || [];
 
   for (let r = 0; r < rowCount; r++) {
     const candidateY = rowCount === 1 ? minY + height / 2 : startY + r * rowStep;
-    const validRowSeats: Point[] = [];
+    const rowLabel = getRowLabel(r);
+    const rowConfig = rowConfigs.find((rc) => rc.row === rowLabel);
+    const seatsInRow = rowConfig ? rowConfig.seatCount : seatsPerRow;
 
-    for (let c = 0; c < seatsPerRow; c++) {
-      const candidateX = seatsPerRow === 1 ? minX + width / 2 : startX + c * seatStep;
-      const center: Point = { x: candidateX, y: candidateY };
+    let rowStartX = startX;
+    let rowEndX = endX;
 
-      if (isSeatCircleValid(center, seatRadius, polygon, tolerance)) {
-        validRowSeats.push(center);
+    if (clipToBoundary) {
+      const span = getPolygonHorizontalSpanAtY(candidateY, polygon, pad);
+      if (span) {
+        rowStartX = span.xMin;
+        rowEndX = span.xMax;
       }
     }
 
-    if (validRowSeats.length > 0) {
-      // Sort seats left-to-right within the row
-      validRowSeats.sort((a, b) => a.x - b.x);
+    const step = seatsInRow > 1 ? (rowEndX - rowStartX) / (seatsInRow - 1) : 0;
 
-      const rowLabel = getRowLabel(activeRowIndex);
-      validRowSeats.forEach((seatPt, seatIdx) => {
-        const seatNum = seatIdx + 1;
-        const seat: GeneratedSeat = {
-          row: rowLabel,
-          number: seatNum,
-          x: Math.round(seatPt.x * 100) / 100,
-          y: Math.round(seatPt.y * 100) / 100,
-        };
-        if (sectionId) {
-          seat.sectionId = sectionId;
-          seat.id = `${sectionId}-${rowLabel}-${seatNum}`;
-          seat.status = 'AVAILABLE';
-        }
-        seats.push(seat);
-      });
+    for (let c = 0; c < seatsInRow; c++) {
+      const candidateX = seatsInRow === 1 ? (rowStartX + rowEndX) / 2 : rowStartX + c * step;
+      const center: Point = { x: candidateX, y: candidateY };
 
-      activeRowIndex++;
+      const seatNum = c + 1;
+      const seatId = `${rowLabel}-${seatNum}`;
+
+      // 1. Skip if manually disabled/deleted by the user
+      if (disabledSeats.includes(seatId)) {
+        continue;
+      }
+
+      // 2. Skip if boundary clipping is enabled and seat lies outside the polygon boundary
+      if (clipToBoundary && !isSeatCircleValid(center, seatRadius, polygon, tolerance)) {
+        continue;
+      }
+
+      const seat: GeneratedSeat = {
+        row: rowLabel,
+        number: seatNum,
+        x: Math.round(center.x * 100) / 100,
+        y: Math.round(center.y * 100) / 100,
+      };
+
+      if (sectionId) {
+        seat.sectionId = sectionId;
+        seat.id = `${sectionId}-${rowLabel}-${seatNum}`;
+        seat.status = 'AVAILABLE';
+      }
+      seats.push(seat);
     }
   }
 

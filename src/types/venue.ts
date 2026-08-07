@@ -12,6 +12,9 @@ export interface SectionGeometry {
   cy?: number;
   r?: number;
   rotation?: number;
+  rowConfigs?: { row: string; seatCount: number }[];
+  clipToBoundary?: boolean;
+  disabledSeats?: string[];
 }
 
 export interface PricingTierDTO {
@@ -88,6 +91,7 @@ export interface LockSeatsResult {
   reservationId?: string;
   expiresAt?: string;
   error?: string;
+  unavailableIds?: string[];
 }
 
 export interface ConfirmBookingInput {

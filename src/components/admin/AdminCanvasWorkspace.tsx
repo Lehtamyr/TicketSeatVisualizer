@@ -3,7 +3,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Point, ShapeType, SectionGeometry } from '@/types/venue';
-import { generateSeatGrid, GeneratedSeat } from '@/lib/seatGenerator';
+import { generateSeatGrid, GeneratedSeat, getRowLabel } from '@/lib/seatGenerator';
 import { renderShapePath, calculateBoundingBox, calculateCentroid, calculatePolygonArea, generateCirclePoints } from '@/lib/geometry';
 import {
   Square, Triangle, Pentagon, MousePointer, Trash2, Save, Eye, EyeOff,
@@ -359,6 +359,29 @@ export function AdminCanvasWorkspace() {
     }));
   }, [generateSeats]);
 
+  const handleToggleSeat = useCallback((sectionId: string, row: string, number: number) => {
+    setSections((prev) => prev.map((s) => {
+      if (s.id !== sectionId) return s;
+      
+      const seatKey = `${row}-${number}`;
+      const currentDisabled = s.geometry.disabledSeats || [];
+      const updatedDisabled = currentDisabled.includes(seatKey)
+        ? currentDisabled.filter((id) => id !== seatKey)
+        : [...currentDisabled, seatKey];
+
+      const updatedGeometry = {
+        ...s.geometry,
+        disabledSeats: updatedDisabled,
+      };
+
+      return {
+        ...s,
+        geometry: updatedGeometry,
+        seats: generateSeats(updatedGeometry, s.rowCount, s.seatsPerRow),
+      };
+    }));
+  }, [generateSeats]);
+
   const deleteSection = useCallback((id: string) => {
     setSections((prev) => prev.filter((s) => s.id !== id));
     if (selectedId === id) setSelectedId(null);
@@ -402,11 +425,17 @@ export function AdminCanvasWorkspace() {
       setSaving(false);
       if (data.success || response.ok) {
         setSavedOk(true);
-        if (data.data?.id) {
-          setLayoutId(data.data.id);
-          router.replace(`/admin/layout-builder?layoutId=${data.data.id}`);
+        const resolvedId = data.data?.id || data.layoutId || layoutId;
+        if (resolvedId) {
+          setLayoutId(resolvedId);
+          router.replace(`/admin/layout-builder?layoutId=${resolvedId}`);
         }
-        setTimeout(() => setSavedOk(false), 3000);
+        setTimeout(() => {
+          setSavedOk(false);
+          if (resolvedId) {
+            router.push(`/admin/layout-builder/seat-editor?layoutId=${resolvedId}`);
+          }
+        }, 1500);
       } else {
         setSaveError(data.error ?? 'Save failed.');
       }
@@ -538,9 +567,9 @@ export function AdminCanvasWorkspace() {
                       data-testid={`grid-preview-seat-${si}`}
                       cx={seat.x}
                       cy={seat.y}
-                      r="3"
+                      r="3.5"
                       fill={s.color}
-                      fillOpacity="0.7"
+                      fillOpacity="0.75"
                       style={{ pointerEvents: 'none' }}
                     />
                   ))}
@@ -725,6 +754,8 @@ export function AdminCanvasWorkspace() {
               <p className="text-lg font-bold text-white mt-0.5">{selectedSection.seats.length}</p>
               <p className="text-xs text-slate-500">inside polygon boundary</p>
             </div>
+
+
 
             <button
               onClick={() => updateSection(selectedSection.id, { showSeats: !selectedSection.showSeats })}

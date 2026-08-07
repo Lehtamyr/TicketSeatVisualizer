@@ -15,8 +15,38 @@ function parseGeometry(raw: unknown) {
   return raw;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const url = new URL(request.url);
+    const layoutId = url.searchParams.get('layoutId');
+
+    if (layoutId) {
+      const layout = await prisma.venueLayout.findUnique({
+        where: { id: layoutId },
+        include: {
+          sections: {
+            include: {
+              seats: true,
+            },
+          },
+        },
+      });
+
+      if (!layout) {
+        return NextResponse.json({ error: 'Layout not found' }, { status: 404 });
+      }
+
+      return NextResponse.json({
+        data: {
+          ...layout,
+          sections: layout.sections.map((s) => ({
+            ...s,
+            geometry: parseGeometry(s.geometry),
+          })),
+        }
+      });
+    }
+
     const layouts = await prisma.venueLayout.findMany({
       include: {
         sections: {

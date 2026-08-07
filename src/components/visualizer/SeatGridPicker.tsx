@@ -92,6 +92,8 @@ export function SeatGridPicker({ section, seats, selectedIds, onToggleSeat }: Se
           const isAvailable = seat.status === 'AVAILABLE';
           const isHeld = seat.status === 'HELD';
           const isReserved = seat.status === 'RESERVED' || seat.status === 'BLOCKED';
+          // Own selected seats should always be clickable (user needs to deselect them)
+          const isBlocked = isSelected ? false : (isReserved || isHeld);
 
           let fillClass = '';
           if (isSelected) fillClass = 'seat-selected';
@@ -110,11 +112,11 @@ export function SeatGridPicker({ section, seats, selectedIds, onToggleSeat }: Se
               className={`seat-circle ${fillClass}${isSelected ? ' selected active' : ''}${isHeld ? ' held' : ''}`}
               filter={isSelected ? 'url(#seat-glow)' : undefined}
               role="button"
-              aria-disabled={isReserved || isHeld ? 'true' : undefined}
+              aria-disabled={isBlocked ? 'true' : undefined}
               onClick={() => {
-                if (!isReserved && !isHeld) onToggleSeat(seat);
+                if (!isBlocked) onToggleSeat(seat);
               }}
-              style={{ cursor: isReserved || isHeld ? 'not-allowed' : 'pointer' }}
+              style={{ cursor: isBlocked ? 'not-allowed' : 'pointer' }}
             >
               <title>{isReserved ? 'Sold' : isHeld ? 'Held' : `Row ${seat.row} · Seat ${seat.number} · $${seat.price}`}</title>
             </circle>

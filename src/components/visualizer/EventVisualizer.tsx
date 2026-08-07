@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useCallback, useEffect, useId } from 'react';
+import React, { useState, useCallback, useEffect, useId, useRef } from 'react';
 import { EventDTO, SectionDTO, SeatDTO } from '@/types/venue';
 import { VenueMapCanvas } from '@/components/visualizer/VenueMapCanvas';
 import { SeatGridPicker } from '@/components/visualizer/SeatGridPicker';
 import { BookingCartSidebar } from '@/components/visualizer/BookingCartSidebar';
 import { getSectionSeats } from '@/actions/getSectionSeats';
-import { ArrowLeft, Loader2, Users } from 'lucide-react';
+import { ArrowLeft, Loader2, Users, X } from 'lucide-react';
 
 interface EventVisualizerProps {
   event: EventDTO;
@@ -15,7 +15,11 @@ interface EventVisualizerProps {
 type View = 'map' | 'seats';
 
 export function EventVisualizer({ event }: EventVisualizerProps) {
-  const sessionId = useId();
+  const [sessionId, setSessionId] = useState<string>('anonymous');
+
+  useEffect(() => {
+    setSessionId(`sess-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`);
+  }, []);
   const [view, setView] = useState<View>('map');
   const [selectedSection, setSelectedSection] = useState<SectionDTO | null>(null);
   const [seats, setSeats] = useState<SeatDTO[]>([]);
@@ -45,21 +49,24 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
     }
   }, []);
 
-  const handleBackToMap = useCallback(() => {
-    setView('map');
-    setSelectedSection(null);
-    setSeats([]);
-    setSelectedSeatIds(new Set());
-  }, []);
+  const lastLockedIdsRef = useRef<string[]>([]);
+  const [lockError, setLockError] = useState<string | null>(null);
 
   const handleToggleSeat = useCallback((seat: SeatDTO) => {
+    const isDeselecting = selectedSeatIds.has(seat.id);
     setSelectedSeatIds((prev) => {
       const next = new Set(prev);
       if (next.has(seat.id)) next.delete(seat.id);
       else next.add(seat.id);
       return next;
     });
-  }, []);
+    // Optimistically mark deselected seat as AVAILABLE in local state
+    if (isDeselecting) {
+      setSeats((prev) => prev.map((s) =>
+        s.id === seat.id ? { ...s, status: 'AVAILABLE' } : s
+      ));
+    }
+  }, [selectedSeatIds]);
 
   const handleClearSeat = useCallback((seatId: string) => {
     setSelectedSeatIds((prev) => {
@@ -67,15 +74,118 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
       next.delete(seatId);
       return next;
     });
+    // Optimistically mark cleared seat as AVAILABLE in local state
+    setSeats((prev) => prev.map((s) =>
+      s.id === seatId ? { ...s, status: 'AVAILABLE' } : s
+    ));
   }, []);
 
   const handleBookingComplete = useCallback(async () => {
     if (!selectedSection) return;
     // Refresh seats
+    lastLockedIdsRef.current = [];
     setSelectedSeatIds(new Set());
     const refreshed = await getSectionSeats(selectedSection.id);
     setSeats(refreshed);
   }, [selectedSection]);
+
+  const handleBackToMap = useCallback(() => {
+    // Release locks in database immediately
+    fetch('/api/reservations/lock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        eventId: event.id,
+        seatIds: [],
+        userSessionId: sessionId,
+      }),
+    }).catch((err) => console.error('Failed to release locks on back:', err));
+
+    setView('map');
+    setSelectedSection(null);
+    setSeats([]);
+    lastLockedIdsRef.current = [];
+    setSelectedSeatIds(new Set());
+  }, [event.id, sessionId]);
+
+  // Synchronize seat states (polling) in real-time when seat picker is open
+  useEffect(() => {
+    if (view !== 'seats' || !selectedSection) return;
+
+    let active = true;
+    const intervalId = setInterval(async () => {
+      try {
+        const refreshed = await getSectionSeats(selectedSection.id);
+        if (active) {
+          setSeats(refreshed);
+        }
+      } catch (err) {
+        console.error('Failed to poll seat updates:', err);
+      }
+    }, 3000); // 3 seconds interval
+
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+    };
+  }, [view, selectedSection]);
+
+  // Debounced database lock synchronization
+  useEffect(() => {
+    if (view !== 'seats' || !selectedSection) return;
+
+    const currentIds = Array.from(selectedSeatIds).sort();
+    const lastIds = [...lastLockedIdsRef.current].sort();
+
+    // Skip redundant sync calls
+    if (JSON.stringify(currentIds) === JSON.stringify(lastIds)) {
+      return;
+    }
+
+    const timerId = setTimeout(async () => {
+      setLockError(null);
+      try {
+        const response = await fetch('/api/reservations/lock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            eventId: event.id,
+            seatIds: currentIds,
+            userSessionId: sessionId,
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          if (data.unavailableIds && Array.isArray(data.unavailableIds) && data.unavailableIds.length > 0) {
+            const badIds = new Set<string>(data.unavailableIds);
+            
+            // Clean up bad/stale seats from current selection
+            setSelectedSeatIds((prev) => {
+              const next = new Set(prev);
+              badIds.forEach((id) => next.delete(id));
+              return next;
+            });
+
+            // Update last locked reference to exclude the bad seats
+            lastLockedIdsRef.current = lastLockedIdsRef.current.filter((id) => !badIds.has(id));
+
+            setLockError(data.error || 'Some seats in your cart are no longer available and have been removed.');
+            return; // Return early; state change will trigger re-sync for remaining seats
+          }
+
+          throw new Error(data.error || 'One or more seats are no longer available.');
+        }
+        // Success: update reference
+        lastLockedIdsRef.current = currentIds;
+      } catch (err: any) {
+        // Revert to the last successfully locked state
+        setSelectedSeatIds(new Set(lastLockedIdsRef.current));
+        setLockError(err.message || 'Selected seats are no longer available.');
+      }
+    }, 400); // 400ms debounce delay
+
+    return () => clearTimeout(timerId);
+  }, [selectedSeatIds, view, selectedSection, event.id, sessionId]);
 
   const selectedSeatObjects = seats.filter((s) => selectedSeatIds.has(s.id));
 
@@ -144,6 +254,15 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
                     Back to Map
                   </button>
                 </div>
+
+                {lockError && (
+                  <div className="bg-red-500/10 border-b border-red-500/20 px-6 py-2.5 flex items-center justify-between text-xs text-red-400 font-medium">
+                    <span>{lockError}</span>
+                    <button onClick={() => setLockError(null)} className="p-1 hover:text-red-300 transition-colors">
+                      <X size={12} />
+                    </button>
+                  </div>
+                )}
 
                 {/* Seat picker container */}
                 <div className="flex-1 overflow-auto p-6 flex items-center justify-center">
