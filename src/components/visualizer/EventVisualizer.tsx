@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useCallback, useEffect, useId, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useId, useRef, useMemo } from 'react';
 import { EventDTO, SectionDTO, SeatDTO } from '@/types/venue';
 import { VenueMapCanvas } from '@/components/visualizer/VenueMapCanvas';
 import { SeatGridPicker } from '@/components/visualizer/SeatGridPicker';
 import { BookingCartSidebar } from '@/components/visualizer/BookingCartSidebar';
 import { getSectionSeats } from '@/actions/getSectionSeats';
+import { generateSeatGrid } from '@/lib/seatGenerator';
 import { ArrowLeft, Loader2, Users, X } from 'lucide-react';
 
 interface EventVisualizerProps {
@@ -28,7 +29,7 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
   const [selectedSeatIds, setSelectedSeatIds] = useState<Set<string>>(new Set());
 
   const handleSectionSelect = useCallback(async (section: SectionDTO) => {
-    if (section.totalSeats === 0) return;
+    if (section.shapeType === 'STAGE' || section.geometry?.shapeType === 'STAGE') return;
     setSelectedSection(section);
     setView('seats');
     setSelectedSeatIds(new Set());
@@ -42,9 +43,18 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
     setLoadingSeats(true);
     try {
       const loaded = await getSectionSeats(section.id);
-      setSeats(loaded);
+      if (loaded && loaded.length > 0) {
+        setSeats(loaded);
+      } else if ((section as any).seats && (section as any).seats.length > 0) {
+        setSeats((section as any).seats);
+      } else {
+        setSeats([]);
+      }
     } catch (err) {
       console.error('Failed to load seats:', err);
+      if ((section as any).seats && (section as any).seats.length > 0) {
+        setSeats((section as any).seats);
+      }
     } finally {
       setLoadingSeats(false);
     }
@@ -188,7 +198,20 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
     return () => clearTimeout(timerId);
   }, [selectedSeatIds, view, selectedSection, event.id, sessionId]);
 
-  const selectedSeatObjects = seats.filter((s) => selectedSeatIds.has(s.id));
+  const effectiveSeats = useMemo(() => {
+    if (seats && seats.length > 0) return seats;
+    if (!selectedSection) return [];
+    return generateSeatGrid({
+      geometry: { ...selectedSection.geometry, clipToBoundary: false },
+      rowCount: (selectedSection as any).rowCount || 8,
+      seatsPerRow: (selectedSection as any).seatsPerRow || 12,
+      seatRadius: 7,
+      padding: 14,
+      sectionId: selectedSection.id,
+    }) as SeatDTO[];
+  }, [seats, selectedSection]);
+
+  const selectedSeatObjects = effectiveSeats.filter((s: SeatDTO) => selectedSeatIds.has(s.id));
 
   return (
     <div className="flex flex-col h-full">
@@ -235,15 +258,17 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
             />
           </div>
 
-          {/* Seat Grid Overlay Modal (covers canvas view, visible when view === 'seats') */}
+          {/* Modal Dialog for SeatGridPicker */}
           {view === 'seats' && selectedSection && (
             <div
               data-testid="seat-grid-overlay"
-              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-6 z-10 seat-grid-picker"
+              className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 seat-grid-picker"
             >
-              <div className="bg-slate-900 border border-white/[0.08] rounded-3xl w-full max-w-2xl h-full max-h-[85vh] flex flex-col shadow-2xl relative">
-                {/* Header with back button */}
-                <div className="px-6 py-4 border-b border-white/[0.06] flex items-center justify-between">
+              <div
+                className="w-full max-w-5xl bg-[#090d16] border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+              >
+                {/* Header */}
+                <div className="px-6 py-4 border-b border-white/[0.06] flex items-center justify-between bg-white/[0.02]">
                   <div className="flex items-center gap-2">
                     <div className="w-3.5 h-3.5 rounded-sm" style={{ background: selectedSection.color }} />
                     <span className="font-semibold text-white">{selectedSection.name} Seats</span>
@@ -265,44 +290,41 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
                   </div>
                 )}
 
-                {/* Seat picker container */}
-                <div className="flex-1 overflow-auto p-6 flex items-center justify-center">
-                  {loadingSeats ? (
-                    <div className="flex items-center gap-3 text-slate-400">
-                      <Loader2 size={24} className="animate-spin" />
-                      <span className="text-sm">Loading seats…</span>
-                    </div>
-                  ) : seats.length === 0 ? (
-                    <div className="text-slate-500 text-sm">
-                      No seats found for this section.
-                    </div>
-                  ) : (
-                    <SeatGridPicker
+                {/* Modal Body: Seat Grid on Left, Booking Sidebar on Right */}
+                <div className="flex flex-1 overflow-hidden">
+                  <div className="flex-1 overflow-auto p-6 flex items-center justify-center">
+                    {loadingSeats ? (
+                      <div className="flex items-center gap-3 text-slate-400">
+                        <Loader2 size={24} className="animate-spin" />
+                        <span className="text-sm">Loading seats…</span>
+                      </div>
+                    ) : (
+                      <SeatGridPicker
+                        section={selectedSection}
+                        seats={seats}
+                        selectedIds={selectedSeatIds}
+                        onToggleSeat={handleToggleSeat}
+                        sessionId={sessionId}
+                      />
+                    )}
+                  </div>
+
+                  {/* Right: booking cart */}
+                  <div className="w-80 flex-shrink-0 p-4 border-l border-white/[0.06] bg-[#070a12] flex flex-col">
+                    <BookingCartSidebar
                       section={selectedSection}
-                      seats={seats}
-                      selectedIds={selectedSeatIds}
-                      onToggleSeat={handleToggleSeat}
+                      eventId={event.id}
+                      selectedSeats={selectedSeatObjects}
+                      onClearSeat={handleClearSeat}
+                      onBookingComplete={handleBookingComplete}
+                      userSessionId={sessionId}
                     />
-                  )}
+                  </div>
                 </div>
               </div>
             </div>
           )}
         </div>
-
-        {/* Right: booking cart (only in seat view) */}
-        {view === 'seats' && selectedSection && (
-          <div className="w-72 flex-shrink-0 p-4 border-l border-white/[0.04]">
-            <BookingCartSidebar
-              section={selectedSection}
-              eventId={event.id}
-              selectedSeats={selectedSeatObjects}
-              onClearSeat={handleClearSeat}
-              onBookingComplete={handleBookingComplete}
-              userSessionId={sessionId}
-            />
-          </div>
-        )}
       </div>
     </div>
   );

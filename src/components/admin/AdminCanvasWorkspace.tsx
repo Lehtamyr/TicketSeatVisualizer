@@ -7,7 +7,7 @@ import { generateSeatGrid, GeneratedSeat, getRowLabel } from '@/lib/seatGenerato
 import { renderShapePath, calculateBoundingBox, calculateCentroid, calculatePolygonArea, generateCirclePoints } from '@/lib/geometry';
 import {
   Square, Triangle, Pentagon, MousePointer, Trash2, Save, Eye, EyeOff,
-  Loader2, CheckCircle, Plus, Settings, Move, Grid3X3, Circle
+  Loader2, CheckCircle, Plus, Settings, Move, Grid3X3, Circle, X
 } from 'lucide-react';
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
@@ -25,9 +25,19 @@ interface AdminSection {
   showSeats: boolean;
 }
 
-type Tool = 'select' | 'rectangle' | 'triangle' | 'polygon' | 'circle';
+type Tool = 'select' | 'rectangle' | 'triangle' | 'polygon' | 'circle' | 'stage';
 
-const COLORS = ['#6366f1','#22d3ee','#f59e0b','#10b981','#ef4444','#a78bfa','#fb923c','#e879f9','#34d399','#f472b6'];
+const COLORS = [
+  '#6366f1', '#818cf8', '#4f46e5',
+  '#22d3ee', '#06b6d4', '#14b8a6',
+  '#10b981', '#059669', '#84cc16',
+  '#f59e0b', '#d97706', '#eab308',
+  '#fb923c', '#ea580c', '#ff7849',
+  '#ef4444', '#dc2626', '#f43f5e',
+  '#a78bfa', '#7c3aed', '#c084fc',
+  '#e879f9', '#f472b6', '#db2777',
+  '#64748b', '#94a3b8'
+];
 
 const CANVAS_W = 1000;
 const CANVAS_H = 700;
@@ -39,6 +49,7 @@ const DEFAULT_SECTION: AdminSection = {
   shapeType: 'RECTANGLE',
   geometry: {
     shapeType: 'RECTANGLE',
+    clipToBoundary: true,
     points: [
       { x: 100, y: 100 },
       { x: 300, y: 100 },
@@ -88,7 +99,9 @@ export function AdminCanvasWorkspace() {
   const [polyPoints, setPolyPoints] = useState<Point[]>([]);
   const [rectStart, setRectStart] = useState<Point | null>(null);
   const [rectCurrent, setRectCurrent] = useState<Point | null>(null);
+  const [resizingHandle, setResizingHandle] = useState<{ sectionId: string; handle: 'tl' | 'tr' | 'bl' | 'br' } | null>(null);
   const [layoutName, setLayoutName] = useState('My Venue Layout');
+  const [snapToGrid, setSnapToGrid] = useState(true);
 
   useEffect(() => {
     if (!layoutIdParam) return;
@@ -100,19 +113,23 @@ export function AdminCanvasWorkspace() {
           setLayoutId(layout.id);
           setLayoutName(layout.name);
           if (Array.isArray(layout.sections)) {
-            const mapped = layout.sections.map((s: any) => ({
-              id: s.id,
-              name: s.name,
-              code: s.code,
-              shapeType: s.shapeType,
-              geometry: s.geometry,
-              color: s.color,
-              price: s.price,
-              rowCount: s.rowCount,
-              seatsPerRow: s.seatsPerRow,
-              seats: s.seats || [],
-              showSeats: true,
-            }));
+            const mapped = layout.sections.map((s: any) => {
+              const geomObj = typeof s.geometry === 'string' ? (() => { try { return JSON.parse(s.geometry); } catch { return {}; } })() : s.geometry;
+              const isStageShape = s.shapeType === 'STAGE' || geomObj?.shapeType === 'STAGE';
+              return {
+                id: s.id,
+                name: s.name,
+                code: s.code,
+                shapeType: isStageShape ? 'STAGE' : s.shapeType,
+                geometry: { ...geomObj, shapeType: isStageShape ? 'STAGE' : (geomObj?.shapeType || s.shapeType) },
+                color: isStageShape ? '#312e81' : s.color,
+                price: isStageShape ? 0 : s.price,
+                rowCount: isStageShape ? 0 : s.rowCount,
+                seatsPerRow: isStageShape ? 0 : s.seatsPerRow,
+                seats: isStageShape ? [] : (s.seats || []),
+                showSeats: true,
+              };
+            });
             setSections(mapped);
           }
         }
@@ -142,6 +159,18 @@ export function AdminCanvasWorkspace() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedId]);
 
+  // Global window mouseup listener to guarantee drag & resize states release anywhere on screen
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      setDraggedSectionId(null);
+      setDragStartPt(null);
+      setResizingHandle(null);
+    };
+
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+  }, []);
+
   const [saving, setSaving] = useState(false);
   const [savedOk, setSavedOk] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -159,18 +188,31 @@ export function AdminCanvasWorkspace() {
     const rect = svgRef.current.getBoundingClientRect();
     const scaleX = CANVAS_W / rect.width;
     const scaleY = CANVAS_H / rect.height;
+    const rawX = (e.clientX - rect.left) * scaleX;
+    const rawY = (e.clientY - rect.top) * scaleY;
+    
+    if (snapToGrid) {
+      return {
+        x: Math.round(rawX / 20) * 20,
+        y: Math.round(rawY / 20) * 20,
+      };
+    }
+
     return {
-      x: Math.round((e.clientX - rect.left) * scaleX),
-      y: Math.round((e.clientY - rect.top) * scaleY),
+      x: Math.round(rawX),
+      y: Math.round(rawY),
     };
-  }, []);
+  }, [snapToGrid]);
 
   const generateSeats = useCallback((geometry: SectionGeometry, rowCount: number, seatsPerRow: number): GeneratedSeat[] => {
     return generateSeatGrid({ geometry, rowCount, seatsPerRow, seatRadius: 7, padding: 14 });
   }, []);
 
+  const lastFinalizedTimeRef = useRef<number>(0);
+
   // Use functional state updates for section creation
   const finalizeSection = useCallback((points: Point[], shapeType: ShapeType) => {
+    lastFinalizedTimeRef.current = Date.now();
     // Filter out duplicate or near-identical vertices (< 10px apart)
     const uniquePoints: Point[] = [];
     for (const p of points) {
@@ -185,25 +227,26 @@ export function AdminCanvasWorkspace() {
     const area = calculatePolygonArea(uniquePoints);
     if (bbox.width < 20 || bbox.height < 20 || area < 100) return;
 
-    const geometry: SectionGeometry = { shapeType, points: uniquePoints };
+    const geometry: SectionGeometry = { shapeType, points: uniquePoints, clipToBoundary: true };
     const rowCount = 8;
     const seatsPerRow = 12;
     const id = `section-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     setSections((prev) => {
       const count = prev.length + 1;
+      const isStage = shapeType === 'STAGE';
       const newSection: AdminSection = {
         id,
-        name: `Section ${count}`,
-        code: `S${count.toString().padStart(2, '0')}`,
+        name: isStage ? 'Main Stage' : `Section ${count}`,
+        code: isStage ? 'STAGE' : `S${count.toString().padStart(2, '0')}`,
         shapeType,
         geometry,
-        color: getNextColor(),
-        price: 75,
-        rowCount,
-        seatsPerRow,
-        seats: generateSeats(geometry, rowCount, seatsPerRow),
-        showSeats: true,
+        color: isStage ? '#4f46e5' : getNextColor(),
+        price: isStage ? 0 : 75,
+        rowCount: isStage ? 0 : rowCount,
+        seatsPerRow: isStage ? 0 : seatsPerRow,
+        seats: isStage ? [] : generateSeats(geometry, rowCount, seatsPerRow),
+        showSeats: !isStage,
       };
       return [...prev, newSection];
     });
@@ -212,9 +255,10 @@ export function AdminCanvasWorkspace() {
 
   /* ── Mouse handlers ──────────────────────────────────────────────────── */
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    if (Date.now() - lastFinalizedTimeRef.current < 350) return;
     const pt = getSVGPoint(e);
 
-    if (tool === 'rectangle' || tool === 'circle') {
+    if (tool === 'rectangle' || tool === 'circle' || tool === 'stage') {
       setRectStart(pt);
       setRectCurrent(pt);
       setDrawing(true);
@@ -222,17 +266,15 @@ export function AdminCanvasWorkspace() {
       if (!drawing) {
         setPolyPoints([pt, pt]); // Point 1, and preview point 2
         setDrawing(true);
-      } else {
-        setPolyPoints((prev) => {
-          const finalized = prev.slice(0, -1);
-          const updated = [...finalized, pt, pt]; // Add point 2, and preview point 3
-          if (updated.length === 4) { // We placed point 3
-            finalizeSection(updated.slice(0, 3), 'TRIANGLE');
-            setDrawing(false);
-            return [];
-          }
-          return updated;
-        });
+      } else if (polyPoints.length === 2) {
+        setPolyPoints([polyPoints[0], pt, pt]); // Point 2 placed, and preview point 3
+      } else if (polyPoints.length >= 3) {
+        // Point 3 placed -> finalize triangle
+        const pts: Point[] = [polyPoints[0], polyPoints[1], pt];
+        finalizeSection(pts, 'TRIANGLE');
+        setPolyPoints([]);
+        setDrawing(false);
+        setTool('select');
       }
     } else if (tool === 'polygon') {
       if (!drawing) {
@@ -249,7 +291,7 @@ export function AdminCanvasWorkspace() {
         setSelectedId(null);
       }
     }
-  }, [tool, drawing, getSVGPoint, finalizeSection]);
+  }, [tool, drawing, polyPoints, getSVGPoint, finalizeSection]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const pt = getSVGPoint(e);
@@ -291,6 +333,52 @@ export function AdminCanvasWorkspace() {
       return;
     }
 
+    if (resizingHandle) {
+      const pt = getSVGPoint(e);
+      const { sectionId, handle } = resizingHandle;
+      setSections((prev) => prev.map((s) => {
+        if (s.id !== sectionId) return s;
+        const pts = s.geometry.points ?? [];
+        if (pts.length === 0) return s;
+        const minX = Math.min(...pts.map((p) => p.x));
+        const maxX = Math.max(...pts.map((p) => p.x));
+        const minY = Math.min(...pts.map((p) => p.y));
+        const maxY = Math.max(...pts.map((p) => p.y));
+
+        let newMinX = minX, newMaxX = maxX, newMinY = minY, newMaxY = maxY;
+        if (handle === 'br') { newMaxX = Math.max(minX + 20, pt.x); newMaxY = Math.max(minY + 20, pt.y); }
+        else if (handle === 'tr') { newMaxX = Math.max(minX + 20, pt.x); newMinY = Math.min(maxY - 20, pt.y); }
+        else if (handle === 'bl') { newMinX = Math.min(maxX - 20, pt.x); newMaxY = Math.max(minY + 20, pt.y); }
+        else if (handle === 'tl') { newMinX = Math.min(maxX - 20, pt.x); newMinY = Math.min(maxY - 20, pt.y); }
+
+        const scaleX = (newMaxX - newMinX) / Math.max(10, maxX - minX);
+        const scaleY = (newMaxY - newMinY) / Math.max(10, maxY - minY);
+        const originX = (handle === 'tl' || handle === 'bl') ? maxX : minX;
+        const originY = (handle === 'tl' || handle === 'tr') ? maxY : minY;
+
+        const newPts = pts.map((p) => ({
+          x: Math.round(originX + (p.x - originX) * scaleX),
+          y: Math.round(originY + (p.y - originY) * scaleY),
+        }));
+
+        const updatedGeometry: SectionGeometry = {
+          ...s.geometry,
+          points: newPts,
+          x: Math.min(...newPts.map((p) => p.x)),
+          y: Math.min(...newPts.map((p) => p.y)),
+          width: newMaxX - newMinX,
+          height: newMaxY - newMinY,
+        };
+
+        return {
+          ...s,
+          geometry: updatedGeometry,
+          seats: generateSeats(updatedGeometry, s.rowCount, s.seatsPerRow),
+        };
+      }));
+      return;
+    }
+
     if (!drawing) return;
     if (tool === 'rectangle' || tool === 'circle') setRectCurrent(pt);
     else if (tool === 'triangle' || tool === 'polygon') {
@@ -301,9 +389,14 @@ export function AdminCanvasWorkspace() {
         return copy;
       });
     }
-  }, [drawing, tool, getSVGPoint, draggedSectionId, dragStartPt, generateSeats]);
+  }, [drawing, tool, getSVGPoint, draggedSectionId, dragStartPt, resizingHandle, generateSeats]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    if (resizingHandle) {
+      setResizingHandle(null);
+      return;
+    }
+
     if (draggedSectionId) {
       setDraggedSectionId(null);
       setDragStartPt(null);
@@ -313,20 +406,20 @@ export function AdminCanvasWorkspace() {
     if (!drawing) return;
     const pt = getSVGPoint(e);
 
-    if (tool === 'rectangle' && rectStart) {
+    if ((tool === 'rectangle' || tool === 'stage') && rectStart) {
       const pts: Point[] = [
         rectStart,
         { x: pt.x, y: rectStart.y },
         pt,
         { x: rectStart.x, y: pt.y },
       ];
-      finalizeSection(pts, 'RECTANGLE');
-      setRectStart(null); setRectCurrent(null); setDrawing(false);
+      finalizeSection(pts, tool === 'stage' ? 'STAGE' : 'RECTANGLE');
+      setRectStart(null); setRectCurrent(null); setDrawing(false); setTool('select');
     } else if (tool === 'circle' && rectStart) {
       const r = Math.max(15, Math.round(Math.hypot(pt.x - rectStart.x, pt.y - rectStart.y)));
       const pts = generateCirclePoints(rectStart.x, rectStart.y, r);
       finalizeSection(pts, 'CIRCLE');
-      setRectStart(null); setRectCurrent(null); setDrawing(false);
+      setRectStart(null); setRectCurrent(null); setDrawing(false); setTool('select');
     }
   }, [drawing, tool, rectStart, getSVGPoint, finalizeSection, draggedSectionId]);
 
@@ -339,6 +432,7 @@ export function AdminCanvasWorkspace() {
       finalizeSection(polyPoints.slice(0, -1), 'POLYGON');
       setPolyPoints([]);
       setDrawing(false);
+      setTool('select');
     }
   }, [tool, polyPoints, finalizeSection]);
 
@@ -391,9 +485,50 @@ export function AdminCanvasWorkspace() {
     });
   };
 
+  /* ── Shape size helper ────────────────────────────────────────────────── */
+  const resizeSectionShape = useCallback((id: string, targetW: number, targetH: number) => {
+    setSections((prev) => prev.map((s) => {
+      if (s.id !== id) return s;
+      const pts = s.geometry.points ?? [];
+      if (pts.length === 0) return s;
+      const centroid = calculateCentroid(pts);
+      const minX = Math.min(...pts.map((p) => p.x));
+      const maxX = Math.max(...pts.map((p) => p.x));
+      const minY = Math.min(...pts.map((p) => p.y));
+      const maxY = Math.max(...pts.map((p) => p.y));
+      const currW = Math.max(10, maxX - minX);
+      const currH = Math.max(10, maxY - minY);
+      const scaleX = targetW / currW;
+      const scaleY = targetH / currH;
+
+      const newPts = pts.map((p) => ({
+        x: Math.round(centroid.x + (p.x - centroid.x) * scaleX),
+        y: Math.round(centroid.y + (p.y - centroid.y) * scaleY),
+      }));
+
+      const updatedGeometry: SectionGeometry = {
+        ...s.geometry,
+        points: newPts,
+        x: Math.min(...newPts.map((p) => p.x)),
+        y: Math.min(...newPts.map((p) => p.y)),
+        width: targetW,
+        height: targetH,
+      };
+
+      return {
+        ...s,
+        geometry: updatedGeometry,
+        seats: generateSeats(updatedGeometry, s.rowCount, s.seatsPerRow),
+      };
+    }));
+  }, [generateSeats]);
+
+  const hasStage = sections.some((s) => s.shapeType === 'STAGE' || s.geometry?.shapeType === 'STAGE');
+
   /* ── Save via HTTP endpoint ─────────────────────────────────────────── */
   const handleSave = async () => {
     setSaving(true); setSavedOk(false); setSaveError(null);
+
     try {
       const response = await fetch('/api/layouts', {
         method: 'POST',
@@ -407,7 +542,7 @@ export function AdminCanvasWorkspace() {
             name: s.name,
             code: s.code,
             shapeType: s.shapeType,
-            geometry: s.geometry,
+            geometry: { ...s.geometry, clipToBoundary: false },
             price: s.price,
             color: s.color,
             rowCount: s.rowCount,
@@ -440,12 +575,17 @@ export function AdminCanvasWorkspace() {
     }
   };
 
-  const selectedSection = sections.find((s) => s.id === selectedId) ?? null;
+  const selectedSection = sections.find((s) => s.id === selectedId);
+  const selectedPts = selectedSection?.geometry.points ?? [];
+  const selectedBbox = {
+    width: selectedPts.length > 0 ? Math.max(...selectedPts.map((p) => p.x)) - Math.min(...selectedPts.map((p) => p.x)) : 0,
+    height: selectedPts.length > 0 ? Math.max(...selectedPts.map((p) => p.y)) - Math.min(...selectedPts.map((p) => p.y)) : 0,
+  };
 
   /* ── Render ──────────────────────────────────────────────────────────── */
   const toolCursor: Record<Tool, string> = {
     select: 'default', rectangle: 'crosshair',
-    triangle: 'crosshair', polygon: 'crosshair', circle: 'crosshair',
+    triangle: 'crosshair', polygon: 'crosshair', circle: 'crosshair', stage: 'crosshair',
   };
 
   return (
@@ -464,6 +604,7 @@ export function AdminCanvasWorkspace() {
               { key: 'triangle', icon: Triangle, label: 'Triangle' },
               { key: 'polygon', icon: Pentagon, label: 'Polygon' },
               { key: 'circle', icon: Circle, label: 'Circle' },
+              { key: 'stage', icon: Grid3X3, label: 'Stage 🎭' },
             ] as const).map(({ key, icon: Icon, label }) => (
               <button
                 key={key}
@@ -515,6 +656,30 @@ export function AdminCanvasWorkspace() {
             className="bg-transparent text-sm font-semibold text-white outline-none flex-1 min-w-0"
             placeholder="Layout name…"
           />
+
+          <button
+            type="button"
+            data-testid="toggle-snap-grid"
+            onClick={() => setSnapToGrid((prev) => !prev)}
+            className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border font-medium transition-all ${
+              snapToGrid
+                ? 'bg-indigo-600/30 border-indigo-500/50 text-indigo-200 shadow-sm'
+                : 'bg-white/[0.04] border-white/[0.08] text-slate-400 hover:text-white'
+            }`}
+            title="Toggle 20px Grid Snapping"
+          >
+            <Grid3X3 size={13} />
+            <span>Snap to Grid {snapToGrid ? '(20px On)' : '(Off)'}</span>
+          </button>
+
+
+
+          {!hasStage && sections.length > 0 && (
+            <div className="flex items-center gap-1 text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg font-medium">
+              <span>⚠️ Stage Required</span>
+            </div>
+          )}
+
           <button
             data-testid="save-layout-button"
             onClick={handleSave}
@@ -527,13 +692,14 @@ export function AdminCanvasWorkspace() {
         </div>
 
         {/* SVG Canvas Workspace */}
-        <div className="flex-1 overflow-hidden bg-[#07090f] relative">
+        <div className="flex-1 relative flex items-center justify-center p-4 bg-[#07090f] overflow-hidden select-none">
           <svg
             ref={svgRef}
             viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
+            preserveAspectRatio="xMidYMid meet"
             data-testid="admin-canvas-workspace"
             id="admin-canvas"
-            className="w-full h-full admin-canvas-workspace"
+            className="w-full h-full max-w-full max-h-full object-contain admin-canvas-workspace"
             style={{ cursor: toolCursor[tool] }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
@@ -542,72 +708,238 @@ export function AdminCanvasWorkspace() {
             onDoubleClick={handleDoubleClick}
           >
             <defs>
-              <pattern id="admin-grid" width="50" height="50" patternUnits="userSpaceOnUse">
-                <path d="M 50 0 L 0 0 0 50" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="0.5" />
+              <pattern id="admin-grid-minor" width="20" height="20" patternUnits="userSpaceOnUse">
+                <path d="M 0 0 H 20 V 20 H 0 Z" fill="none" stroke="rgba(255,255,255,0.40)" strokeWidth="0.8" />
+              </pattern>
+              <pattern id="admin-grid-major" width="100" height="100" patternUnits="userSpaceOnUse">
+                <rect width="100" height="100" fill="url(#admin-grid-minor)" />
+                <path d="M 0 0 H 100 V 100 H 0 Z" fill="none" stroke="rgba(255,255,255,0.50)" strokeWidth="1.2" />
               </pattern>
             </defs>
-            <rect width={CANVAS_W} height={CANVAS_H} fill="url(#admin-grid)" />
+            <rect width={CANVAS_W} height={CANVAS_H} fill="url(#admin-grid-major)" stroke="rgba(255,255,255,0.55)" strokeWidth="1.2" />
 
-            {/* Render drawn sections */}
+            {/* Dimension ruler tick marks along top & left axes */}
+            {Array.from({ length: Math.floor(CANVAS_W / 100) + 1 }).map((_, i) => (
+              <text key={`rx-${i}`} x={i * 100 + 4} y={14} fill="rgba(255,255,255,0.60)" fontSize="9.5" fontWeight="600" fontFamily="JetBrains Mono, monospace" style={{ pointerEvents: 'none', filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.8))' }}>
+                {i * 100}px
+              </text>
+            ))}
+            {Array.from({ length: Math.floor(CANVAS_H / 100) + 1 }).map((_, i) => (
+              i > 0 && (
+                <text key={`ry-${i}`} x={4} y={i * 100 + 13} fill="rgba(255,255,255,0.60)" fontSize="9.5" fontWeight="600" fontFamily="JetBrains Mono, monospace" style={{ pointerEvents: 'none', filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.8))' }}>
+                  {i * 100}px
+                </text>
+              )
+            ))}
+
             {sections.map((s, idx) => {
               const path = renderShapePath(s.geometry);
-              const centroid = calculateCentroid(s.geometry.points ?? []);
+              const pts = s.geometry.points ?? [];
+              const centroid = calculateCentroid(pts);
+              const minX = pts.length > 0 ? Math.min(...pts.map((p) => p.x)) : 0;
+              const maxX = pts.length > 0 ? Math.max(...pts.map((p) => p.x)) : 0;
+              const minY = pts.length > 0 ? Math.min(...pts.map((p) => p.y)) : 0;
+              const maxY = pts.length > 0 ? Math.max(...pts.map((p) => p.y)) : 0;
+              const bbox = { minX, maxX, minY, maxY, width: maxX - minX, height: maxY - minY };
               const isSelected = selectedId === s.id;
               return (
                 <g key={s.id} onClick={(e) => { e.stopPropagation(); setSelectedId(s.id); }}>
                   {/* Seat dots preview (drawn behind) */}
                   {s.showSeats && s.seats.map((seat, si) => (
-                    <circle
-                      key={si}
-                      data-testid={`grid-preview-seat-${si}`}
-                      cx={seat.x}
-                      cy={seat.y}
-                      r="3.5"
-                      fill={s.color}
-                      fillOpacity="0.75"
-                      style={{ pointerEvents: 'none' }}
-                    />
+                    <g key={si}>
+                      <circle
+                        cx={seat.x}
+                        cy={seat.y}
+                        r="5"
+                        fill="none"
+                        stroke="rgba(255,255,255,0.4)"
+                        strokeWidth="0.8"
+                        style={{ pointerEvents: 'none' }}
+                      />
+                      <circle
+                        data-testid={`grid-preview-seat-${si}`}
+                        cx={seat.x}
+                        cy={seat.y}
+                        r="3.5"
+                        fill={s.color}
+                        fillOpacity="0.75"
+                        style={{ pointerEvents: 'none' }}
+                      />
+                    </g>
                   ))}
 
-                  <text x={centroid.x} y={centroid.y - 8} textAnchor="middle"
-                    fill="#fff" fontSize="11" fontWeight="700" fontFamily="Inter, sans-serif"
-                    style={{ pointerEvents: 'none' }}>{s.code}</text>
-                  <text x={centroid.x} y={centroid.y + 8} textAnchor="middle"
-                    fill="rgba(255,255,255,0.5)" fontSize="9" fontFamily="Inter, sans-serif"
-                    style={{ pointerEvents: 'none' }}>{s.name}</text>
+                  {/* Block Centroid Labels: Code, Name, and Size Measurement */}
+                  <g style={{ pointerEvents: 'none' }}>
+                    <text x={centroid.x} y={centroid.y - 12} textAnchor="middle"
+                      fill="#fff" fontSize="11" fontWeight="700" fontFamily="Inter, sans-serif">{s.code}</text>
+                    <text x={centroid.x} y={centroid.y + 2} textAnchor="middle"
+                      fill="rgba(255,255,255,0.7)" fontSize="9" fontFamily="Inter, sans-serif">{s.name}</text>
+                    {/* Size measurement label pill */}
+                    <rect
+                      x={centroid.x - 40}
+                      y={centroid.y + 10}
+                      width="80"
+                      height="15"
+                      rx="4"
+                      fill="rgba(0,0,0,0.65)"
+                      stroke="rgba(56,189,248,0.4)"
+                      strokeWidth="0.8"
+                    />
+                    <text
+                      x={centroid.x}
+                      y={centroid.y + 21}
+                      textAnchor="middle"
+                      fill="#38bdf8"
+                      fontSize="8.5"
+                      fontWeight="600"
+                      fontFamily="JetBrains Mono, monospace"
+                    >
+                      {`${Math.round(bbox.width)} × ${Math.round(bbox.height)} px`}
+                    </text>
+                  </g>
+
+                  {/* Selected Shape Bounding Box CAD Dimension Lines */}
+                  {isSelected && (
+                    <g style={{ pointerEvents: 'none' }}>
+                      {/* Top Width Dimension Line */}
+                      <line x1={bbox.minX} y1={bbox.minY - 10} x2={bbox.maxX} y2={bbox.minY - 10} stroke="#38bdf8" strokeWidth="1" strokeDasharray="3 2" />
+                      <text x={(bbox.minX + bbox.maxX) / 2} y={bbox.minY - 14} textAnchor="middle" fill="#38bdf8" fontSize="8.5" fontFamily="JetBrains Mono, monospace" fontWeight="600">
+                        {`w: ${Math.round(bbox.width)}px`}
+                      </text>
+                      {/* Right Height Dimension Line */}
+                      <line x1={bbox.maxX + 10} y1={bbox.minY} x2={bbox.maxX + 10} y2={bbox.maxY} stroke="#38bdf8" strokeWidth="1" strokeDasharray="3 2" />
+                      <text x={bbox.maxX + 15} y={(bbox.minY + bbox.maxY) / 2 + 3} textAnchor="start" fill="#38bdf8" fontSize="8.5" fontFamily="JetBrains Mono, monospace" fontWeight="600">
+                        {`h: ${Math.round(bbox.height)}px`}
+                      </text>
+                    </g>
+                  )}
+                  {/* Selected Shape Interactive Corner Resize Handles */}
+                  {isSelected && (
+                    <g>
+                      {/* Top-Left Handle */}
+                      <rect
+                        x={bbox.minX - 5} y={bbox.minY - 5} width="10" height="10"
+                        fill="#38bdf8" stroke="#ffffff" strokeWidth="1.5" rx="2"
+                        style={{ cursor: 'nwse-resize' }}
+                        onMouseDown={(e) => { e.stopPropagation(); setResizingHandle({ sectionId: s.id, handle: 'tl' }); }}
+                      />
+                      {/* Top-Right Handle */}
+                      <rect
+                        x={bbox.maxX - 5} y={bbox.minY - 5} width="10" height="10"
+                        fill="#38bdf8" stroke="#ffffff" strokeWidth="1.5" rx="2"
+                        style={{ cursor: 'nesw-resize' }}
+                        onMouseDown={(e) => { e.stopPropagation(); setResizingHandle({ sectionId: s.id, handle: 'tr' }); }}
+                      />
+                      {/* Bottom-Left Handle */}
+                      <rect
+                        x={bbox.minX - 5} y={bbox.maxY - 5} width="10" height="10"
+                        fill="#38bdf8" stroke="#ffffff" strokeWidth="1.5" rx="2"
+                        style={{ cursor: 'nesw-resize' }}
+                        onMouseDown={(e) => { e.stopPropagation(); setResizingHandle({ sectionId: s.id, handle: 'bl' }); }}
+                      />
+                      {/* Bottom-Right Handle */}
+                      <rect
+                        x={bbox.maxX - 5} y={bbox.maxY - 5} width="10" height="10"
+                        fill="#38bdf8" stroke="#ffffff" strokeWidth="1.5" rx="2"
+                        style={{ cursor: 'nwse-resize' }}
+                        onMouseDown={(e) => { e.stopPropagation(); setResizingHandle({ sectionId: s.id, handle: 'br' }); }}
+                      />
+                    </g>
+                  )}
 
                   {/* Fill Path (drawn on top) */}
-                  <path
-                    d={path}
-                    data-testid={`admin-section-shape-${idx + 1}`}
-                    className="canvas-section"
-                    fill={s.color}
-                    fillOpacity={isSelected ? 0.45 : 0.25}
-                    stroke={isSelected ? '#fff' : s.color}
-                    strokeWidth={isSelected ? 2 : 1.5}
-                    style={{ cursor: tool === 'select' ? 'move' : 'pointer' }}
-                    onMouseDown={(e) => {
-                      if (tool === 'select') {
-                        e.stopPropagation();
-                        setSelectedId(s.id);
-                        setDraggedSectionId(s.id);
-                        setDragStartPt(getSVGPoint(e));
-                      }
-                    }}
-                  />
+                  {s.shapeType === 'STAGE' ? (
+                    <g key={`stage-shape-${s.id}`}>
+                      <path
+                        d={path}
+                        data-testid={`admin-section-shape-${idx + 1}`}
+                        className="canvas-section"
+                        fill="#312e81"
+                        fillOpacity={isSelected ? 0.95 : 0.85}
+                        stroke={isSelected ? '#ffffff' : '#818cf8'}
+                        strokeWidth={isSelected ? 2.5 : 1.8}
+                        style={{ cursor: tool === 'select' ? 'move' : 'pointer' }}
+                        onMouseDown={(e) => {
+                          if (tool === 'select') {
+                            e.stopPropagation();
+                            setSelectedId(s.id);
+                            setDraggedSectionId(s.id);
+                            setDragStartPt(getSVGPoint(e));
+                          }
+                        }}
+                      />
+                      <text
+                        x={centroid.x}
+                        y={centroid.y + 4}
+                        textAnchor="middle"
+                        fill="#ffffff"
+                        fontSize="13"
+                        fontWeight="800"
+                        letterSpacing="2"
+                        fontFamily="Inter, sans-serif"
+                        style={{ pointerEvents: 'none' }}
+                      >
+                        STAGE
+                      </text>
+                    </g>
+                  ) : (
+                    <path
+                      d={path}
+                      data-testid={`admin-section-shape-${idx + 1}`}
+                      className="canvas-section"
+                      fill={s.color}
+                      fillOpacity={isSelected ? 0.45 : 0.25}
+                      stroke={isSelected ? '#fff' : s.color}
+                      strokeWidth={isSelected ? 2 : 1.5}
+                      style={{ cursor: tool === 'select' ? 'move' : 'pointer' }}
+                      onMouseDown={(e) => {
+                        if (tool === 'select') {
+                          e.stopPropagation();
+                          setSelectedId(s.id);
+                          setDraggedSectionId(s.id);
+                          setDragStartPt(getSVGPoint(e));
+                        }
+                      }}
+                    />
+                  )}
                 </g>
               );
             })}
 
             {/* Active draw preview */}
-            {drawing && tool === 'rectangle' && rectStart && rectCurrent && (() => {
+            {drawing && (tool === 'rectangle' || tool === 'stage') && rectStart && rectCurrent && (() => {
               const x = Math.min(rectStart.x, rectCurrent.x);
               const y = Math.min(rectStart.y, rectCurrent.y);
               const w = Math.abs(rectCurrent.x - rectStart.x);
               const h = Math.abs(rectCurrent.y - rectStart.y);
+              const isStagePreview = tool === 'stage';
               return (
-                <rect x={x} y={y} width={w} height={h}
-                  fill="rgba(99,102,241,0.15)" stroke="#6366f1" strokeWidth="1.5" strokeDasharray="6 3" />
+                <g style={{ pointerEvents: 'none' }}>
+                  <rect
+                    x={x}
+                    y={y}
+                    width={w}
+                    height={h}
+                    fill={isStagePreview ? 'rgba(79, 70, 229, 0.4)' : 'rgba(99,102,241,0.15)'}
+                    stroke={isStagePreview ? '#818cf8' : '#6366f1'}
+                    strokeWidth="2"
+                    strokeDasharray="6 3"
+                  />
+                  {isStagePreview && (
+                    <text
+                      x={x + w / 2}
+                      y={y + h / 2 + 4}
+                      textAnchor="middle"
+                      fill="#ffffff"
+                      fontSize="13"
+                      fontWeight="800"
+                      letterSpacing="2"
+                      fontFamily="Inter, sans-serif"
+                    >
+                      STAGE
+                    </text>
+                  )}
+                </g>
               );
             })()}
 
@@ -639,11 +971,13 @@ export function AdminCanvasWorkspace() {
       {/* Right Properties Panel */}
       <div
         data-testid="section-property-editor"
-        className="w-64 flex-shrink-0 glass border-l border-white/[0.06] flex flex-col overflow-hidden property-editor-panel"
+        className="w-72 flex-shrink-0 glass border-l border-white/[0.06] flex flex-col overflow-hidden property-editor-panel"
       >
-        <div className="px-4 py-3 border-b border-white/[0.06] flex items-center gap-2">
-          <Settings size={14} className="text-slate-400" />
-          <span className="text-xs font-semibold text-slate-300">Properties</span>
+        <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Settings size={14} className="text-slate-400" />
+            <span className="text-xs font-semibold text-slate-300">Properties</span>
+          </div>
         </div>
         {!selectedSection ? (
           <div className="flex-1 flex items-center justify-center text-center text-slate-600 text-xs px-4">
@@ -651,14 +985,36 @@ export function AdminCanvasWorkspace() {
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-            {/* Color */}
-            <div>
-              <label className="text-xs text-slate-400 block mb-2">Color</label>
-              <div className="flex flex-wrap gap-1.5">
+            {/* Inset Color Palette Card */}
+            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3 flex flex-col gap-2.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-300 block">Section Color</label>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-mono text-slate-400 uppercase">{selectedSection.color}</span>
+                  <label
+                    className="relative cursor-pointer w-6 h-6 rounded-lg border border-white/20 flex items-center justify-center overflow-hidden hover:scale-105 transition-transform shadow-sm"
+                    style={{ background: selectedSection.color }}
+                  >
+                    <input
+                      type="color"
+                      value={selectedSection.color.startsWith('#') && selectedSection.color.length === 7 ? selectedSection.color : '#6366f1'}
+                      onChange={(e) => updateSection(selectedSection.id, { color: e.target.value })}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      title="Choose Custom Hex Color"
+                    />
+                  </label>
+                </div>
+              </div>
+              <div className="grid grid-cols-6 gap-2 justify-items-center max-h-36 overflow-y-auto pr-1">
                 {COLORS.map((c) => (
-                  <button key={c} onClick={() => updateSection(selectedSection.id, { color: c })}
-                    className={`w-6 h-6 rounded-full transition-transform hover:scale-110 ${selectedSection.color === c ? 'ring-2 ring-white ring-offset-1 ring-offset-slate-900 scale-110' : ''}`}
-                    style={{ background: c }} />
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => updateSection(selectedSection.id, { color: c })}
+                    className={`w-6 h-6 rounded-full transition-all hover:scale-115 ${selectedSection.color.toLowerCase() === c.toLowerCase() ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-900 scale-110 shadow-lg' : 'opacity-85 hover:opacity-100'}`}
+                    style={{ background: c }}
+                    title={c}
+                  />
                 ))}
               </div>
             </div>
@@ -685,80 +1041,124 @@ export function AdminCanvasWorkspace() {
               />
             </Field>
 
-            <Field label="Base Price">
-              <input
-                type="number"
-                name="basePrice"
-                data-testid="input-section-price"
-                value={selectedSection.price}
-                onChange={(e) => updateSection(selectedSection.id, { price: Number(e.target.value) })}
-                className="w-full bg-white/[0.06] text-white text-sm rounded-lg px-3 py-2 outline-none border border-white/[0.08] focus:border-indigo-500/50"
-              />
-            </Field>
-
-            {/* Toggle Seat Grid Config Configurator */}
-            <button
-              data-testid="btn-open-grid-generator"
-              onClick={() => {
-                setTempRowCount(selectedSection.rowCount);
-                setTempSeatsPerRow(selectedSection.seatsPerRow);
-                setShowGridConfig(!showGridConfig);
-              }}
-              className="w-full py-2 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/20 rounded-lg text-xs font-semibold text-indigo-300 flex items-center justify-center gap-1.5 transition-all"
-            >
-              <Grid3X3 size={12} />
-              Grid Setup
-            </button>
-
-            {showGridConfig && (
-              <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3 flex flex-col gap-3">
-                <Field label="Row Count">
-                  <input
-                    type="number"
-                    name="rowCount"
-                    data-testid="input-row-count"
-                    value={tempRowCount}
-                    onChange={(e) => setTempRowCount(Number(e.target.value))}
-                    className="w-full bg-white/[0.06] text-white text-sm rounded-lg px-3 py-2 outline-none border border-white/[0.08] focus:border-indigo-500/50"
-                  />
-                </Field>
-
-                <Field label="Seats Per Row">
-                  <input
-                    type="number"
-                    name="seatsPerRow"
-                    data-testid="input-seats-per-row"
-                    value={tempSeatsPerRow}
-                    onChange={(e) => setTempSeatsPerRow(Number(e.target.value))}
-                    className="w-full bg-white/[0.06] text-white text-sm rounded-lg px-3 py-2 outline-none border border-white/[0.08] focus:border-indigo-500/50"
-                  />
-                </Field>
-
-                <button
-                  data-testid="btn-apply-grid-generator"
-                  onClick={handleApplyGridGenerator}
-                  className="w-full py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-500 transition-colors"
-                >
-                  Generate
-                </button>
-              </div>
+            {selectedSection.shapeType !== 'STAGE' && (
+              <Field label="Base Price">
+                <input
+                  type="number"
+                  name="basePrice"
+                  data-testid="input-section-price"
+                  value={selectedSection.price}
+                  onChange={(e) => updateSection(selectedSection.id, { price: Number(e.target.value) })}
+                  className="w-full bg-white/[0.06] text-white text-sm rounded-lg px-3 py-2 outline-none border border-white/[0.08] focus:border-indigo-500/50"
+                />
+              </Field>
             )}
 
-            <div className="bg-white/[0.04] rounded-lg px-3 py-2.5">
-              <p className="text-xs text-slate-400">Generated seats</p>
-              <p className="text-lg font-bold text-white mt-0.5">{selectedSection.seats.length}</p>
-              <p className="text-xs text-slate-500">inside polygon boundary</p>
+            {/* Shape Dimensions Controls (Width & Height) */}
+            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3 flex flex-col gap-2.5">
+              <span className="text-xs font-semibold text-slate-300">Shape Dimensions</span>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Width (px)">
+                  <input
+                    type="number"
+                    min="20"
+                    max="1000"
+                    data-testid="input-shape-width"
+                    value={Math.round(selectedBbox.width)}
+                    onChange={(e) => {
+                      const w = Math.max(20, Number(e.target.value));
+                      resizeSectionShape(selectedSection.id, w, selectedBbox.height);
+                    }}
+                    className="w-full bg-white/[0.06] text-white text-sm rounded-lg px-3 py-2 outline-none border border-white/[0.08] focus:border-indigo-500/50"
+                  />
+                </Field>
+                <Field label="Height (px)">
+                  <input
+                    type="number"
+                    min="20"
+                    max="700"
+                    data-testid="input-shape-height"
+                    value={Math.round(selectedBbox.height)}
+                    onChange={(e) => {
+                      const h = Math.max(20, Number(e.target.value));
+                      resizeSectionShape(selectedSection.id, selectedBbox.width, h);
+                    }}
+                    className="w-full bg-white/[0.06] text-white text-sm rounded-lg px-3 py-2 outline-none border border-white/[0.08] focus:border-indigo-500/50"
+                  />
+                </Field>
+              </div>
             </div>
 
+            {selectedSection.shapeType === 'STAGE' ? (
+              <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-3 flex flex-col gap-1 text-xs text-indigo-300">
+                <span className="font-semibold text-white">Stage Landmark</span>
+                <span>Stage area contains 0 seats. Non-clickable background landmark element. This element has no price or seat availability attributes.</span>
+              </div>
+            ) : (
+              <>
+                {/* Toggle Seat Grid Config Configurator */}
+                <button
+                  data-testid="btn-open-grid-generator"
+                  onClick={() => {
+                    setTempRowCount(selectedSection.rowCount);
+                    setTempSeatsPerRow(selectedSection.seatsPerRow);
+                    setShowGridConfig(!showGridConfig);
+                  }}
+                  className="w-full py-2 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/20 rounded-lg text-xs font-semibold text-indigo-300 flex items-center justify-center gap-1.5 transition-all"
+                >
+                  <Grid3X3 size={12} />
+                  Grid Setup
+                </button>
 
+                {showGridConfig && (
+                  <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3 flex flex-col gap-3">
+                    <Field label="Row Count">
+                      <input
+                        type="number"
+                        name="rowCount"
+                        data-testid="input-row-count"
+                        value={tempRowCount}
+                        onChange={(e) => setTempRowCount(Number(e.target.value))}
+                        className="w-full bg-white/[0.06] text-white text-sm rounded-lg px-3 py-2 outline-none border border-white/[0.08] focus:border-indigo-500/50"
+                      />
+                    </Field>
 
-            <button
-              onClick={() => updateSection(selectedSection.id, { showSeats: !selectedSection.showSeats })}
-              className="flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors"
-            >
-              {selectedSection.showSeats ? <EyeOff size={12} /> : <Eye size={12} />}
-              {selectedSection.showSeats ? 'Hide' : 'Show'} seat preview
-            </button>
+                    <Field label="Seats Per Row">
+                      <input
+                        type="number"
+                        name="seatsPerRow"
+                        data-testid="input-seats-per-row"
+                        value={tempSeatsPerRow}
+                        onChange={(e) => setTempSeatsPerRow(Number(e.target.value))}
+                        className="w-full bg-white/[0.06] text-white text-sm rounded-lg px-3 py-2 outline-none border border-white/[0.08] focus:border-indigo-500/50"
+                      />
+                    </Field>
+
+                    <button
+                      data-testid="btn-apply-grid-generator"
+                      onClick={handleApplyGridGenerator}
+                      className="w-full py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-500 transition-colors"
+                    >
+                      Generate
+                    </button>
+                  </div>
+                )}
+
+                <div className="bg-white/[0.04] rounded-lg px-3 py-2.5">
+                  <p className="text-xs text-slate-400">Generated seats</p>
+                  <p className="text-lg font-bold text-white mt-0.5">{selectedSection.seats.length}</p>
+                  <p className="text-xs text-slate-500">inside polygon boundary</p>
+                </div>
+
+                <button
+                  onClick={() => updateSection(selectedSection.id, { showSeats: !selectedSection.showSeats })}
+                  className="flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors"
+                >
+                  {selectedSection.showSeats ? <EyeOff size={12} /> : <Eye size={12} />}
+                  {selectedSection.showSeats ? 'Hide' : 'Show'} seat preview
+                </button>
+              </>
+            )}
 
             <button
               onClick={() => deleteSection(selectedSection.id)}
@@ -778,6 +1178,16 @@ export function AdminCanvasWorkspace() {
         >
           <CheckCircle size={14} />
           Layout saved successfully!
+        </div>
+      )}
+
+      {saveError && (
+        <div
+          data-testid="toast-notification-error"
+          className="toast-error fixed bottom-4 right-4 bg-red-600/90 text-white px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 animate-fade-in z-50 text-xs font-medium border border-red-500/50 max-w-xs"
+        >
+          <X size={14} />
+          {saveError}
         </div>
       )}
     </div>

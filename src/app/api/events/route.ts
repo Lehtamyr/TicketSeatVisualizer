@@ -52,21 +52,24 @@ export async function POST(request: Request) {
 
       // 3. Clone sections and seats from layout to event
       for (const section of layout.sections) {
+        const geom = typeof section.geometry === 'string' ? (() => { try { return JSON.parse(section.geometry); } catch { return {}; } })() : section.geometry;
+        const isStage = section.shapeType === 'STAGE' || geom?.shapeType === 'STAGE';
+
         const clonedSection = await tx.section.create({
           data: {
             eventId: event.id,
             name: section.name,
             code: section.code,
-            shapeType: section.shapeType,
-            geometry: section.geometry,
-            price: section.price,
+            shapeType: isStage ? 'STAGE' : section.shapeType,
+            geometry: typeof section.geometry === 'string' ? section.geometry : JSON.stringify(section.geometry),
+            price: isStage ? 0 : section.price,
             color: section.color,
-            rowCount: section.rowCount,
-            seatsPerRow: section.seatsPerRow,
+            rowCount: isStage ? 0 : section.rowCount,
+            seatsPerRow: isStage ? 0 : section.seatsPerRow,
           },
         });
 
-        if (section.seats && section.seats.length > 0) {
+        if (!isStage && section.seats && section.seats.length > 0) {
           await tx.seat.createMany({
             data: section.seats.map((seat) => ({
               sectionId: clonedSection.id,

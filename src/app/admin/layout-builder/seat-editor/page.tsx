@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Point, ShapeType, SectionGeometry } from '@/types/venue';
 import { generateSeatGrid, GeneratedSeat, getRowLabel } from '@/lib/seatGenerator';
 import { renderShapePath, calculateCentroid, calculateBoundingBox } from '@/lib/geometry';
+import { SeatGridPicker } from '@/components/visualizer/SeatGridPicker';
 import {
   ArrowLeft, Grid3X3, Save, Loader2, CheckCircle, Eye, EyeOff, X, RefreshCw
 } from 'lucide-react';
@@ -24,7 +25,17 @@ interface AdminSection {
   showSeats: boolean;
 }
 
-const COLORS = ['#6366f1','#22d3ee','#f59e0b','#10b981','#ef4444','#a78bfa','#fb923c','#e879f9','#34d399','#f472b6'];
+const COLORS = [
+  '#6366f1', '#818cf8', '#4f46e5',
+  '#22d3ee', '#06b6d4', '#14b8a6',
+  '#10b981', '#059669', '#84cc16',
+  '#f59e0b', '#d97706', '#eab308',
+  '#fb923c', '#ea580c', '#ff7849',
+  '#ef4444', '#dc2626', '#f43f5e',
+  '#a78bfa', '#7c3aed', '#c084fc',
+  '#e879f9', '#f472b6', '#db2777',
+  '#64748b', '#94a3b8'
+];
 
 function SeatEditorWorkspace() {
   const searchParams = useSearchParams();
@@ -72,6 +83,9 @@ function SeatEditorWorkspace() {
           let geom = s.geometry;
           if (typeof geom === 'string') {
             try { geom = JSON.parse(geom); } catch {}
+          }
+          if (geom && typeof geom === 'object') {
+            geom = { ...geom, clipToBoundary: geom.clipToBoundary === true };
           }
           return {
             id: s.id,
@@ -140,6 +154,42 @@ function SeatEditorWorkspace() {
     }));
   }, [generateSeats]);
 
+  // Toggle full row active/disabled
+  const handleToggleRow = useCallback((sectionId: string, rowLabel: string) => {
+    setSections((prev) => prev.map((s) => {
+      if (s.id !== sectionId) return s;
+      const rowSeats = generateSeats(
+        { ...s.geometry, disabledSeats: [] },
+        s.rowCount,
+        s.seatsPerRow
+      ).filter((st) => st.row === rowLabel);
+
+      const rowKeys = rowSeats.map((st) => `${st.row}-${st.number}`);
+      const currentDisabled = s.geometry.disabledSeats || [];
+      const isRowFullyDisabled = rowKeys.every((k) => currentDisabled.includes(k));
+
+      let updatedDisabled: string[];
+      if (isRowFullyDisabled) {
+        // Restore row
+        updatedDisabled = currentDisabled.filter((k) => !rowKeys.includes(k));
+      } else {
+        // Disable row
+        updatedDisabled = Array.from(new Set([...currentDisabled, ...rowKeys]));
+      }
+
+      const updatedGeometry = {
+        ...s.geometry,
+        disabledSeats: updatedDisabled,
+      };
+
+      return {
+        ...s,
+        geometry: updatedGeometry,
+        seats: generateSeats(updatedGeometry, s.rowCount, s.seatsPerRow),
+      };
+    }));
+  }, [generateSeats]);
+
   // Save changes
   const handleSave = async () => {
     setSaving(true); setSavedOk(false); setError(null);
@@ -156,7 +206,7 @@ function SeatEditorWorkspace() {
             name: s.name,
             code: s.code,
             shapeType: s.shapeType,
-            geometry: s.geometry,
+            geometry: { ...s.geometry, clipToBoundary: false },
             price: s.price,
             color: s.color,
             rowCount: s.rowCount,
@@ -245,7 +295,10 @@ function SeatEditorWorkspace() {
       {/* Main Workspace Body */}
       <div className="flex-1 flex overflow-hidden">
         {/* Visual Map Canvas Workspace */}
-        <div className="flex-1 relative flex items-center justify-center p-8 bg-[#0a0d16] overflow-hidden select-none">
+        <div
+          className="flex-1 relative flex items-center justify-center p-8 transition-colors duration-500 overflow-hidden select-none"
+          style={{ background: selectedSectionId ? 'radial-gradient(ellipse at center, #0c1322 0%, #070a12 100%)' : '#0a0d16' }}
+        >
           {/* Legend indicator */}
           <div className="absolute top-4 left-4 glass px-3 py-2 border border-white/[0.06] rounded-xl text-[10px] text-slate-400 flex flex-col gap-1.5 shadow-lg z-20">
             <span className="font-semibold text-slate-200">Simulation View:</span>
@@ -264,7 +317,8 @@ function SeatEditorWorkspace() {
 
           <svg
             viewBox={viewBoxStr}
-            className="w-full h-full max-w-4xl max-h-[85vh] transition-all duration-500 ease-out"
+            preserveAspectRatio="xMidYMid meet"
+            className="w-full h-full max-w-full max-h-full object-contain transition-all duration-500 ease-out"
           >
             {/* Render sections */}
             {sections.map((s) => {
@@ -283,7 +337,7 @@ function SeatEditorWorkspace() {
                   className="transition-all"
                 >
                   {/* Seating Grid (drawn behind) */}
-                  {s.showSeats && (() => {
+                  {s.showSeats && s.shapeType !== 'STAGE' && (() => {
                     const potentialSeats = generateSeatGrid({
                       geometry: { ...s.geometry, disabledSeats: [] },
                       rowCount: s.rowCount,
@@ -293,38 +347,82 @@ function SeatEditorWorkspace() {
                     });
                     const disabledList = s.geometry.disabledSeats || [];
 
-                    return potentialSeats.map((seat, si) => {
-                      const isDisabled = disabledList.includes(`${seat.row}-${seat.number}`);
-                      return (
-                        <circle
-                          key={si}
-                          cx={seat.x}
-                          cy={seat.y}
-                          r={selectedSectionId ? "6.5" : "3.5"}
-                          fill={isDisabled ? "transparent" : s.color}
-                          stroke={s.color}
-                          strokeWidth={isDisabled ? 1.5 : 0}
-                          strokeDasharray={isDisabled ? "2.5 1.5" : undefined}
-                          fillOpacity={isDisabled ? 0.15 : 0.8}
-                          className="hover:scale-125 transition-transform"
-                          style={{
-                            cursor: selectedSectionId ? 'pointer' : 'default',
-                            transition: 'all 0.15s ease',
-                            pointerEvents: selectedSectionId ? 'auto' : 'none',
-                            transformOrigin: 'center',
-                            transformBox: 'fill-box',
-                          }}
-                          onClick={(e) => {
-                            if (selectedSectionId) {
+                    // Group seats by row for user-style row labels and row deletion controls
+                    const rowGroups: Record<string, typeof potentialSeats> = {};
+                    for (const st of potentialSeats) {
+                      if (!rowGroups[st.row]) rowGroups[st.row] = [];
+                      rowGroups[st.row].push(st);
+                    }
+
+                    const totalSeats = s.rowCount * s.seatsPerRow;
+                    const seatR = selectedSectionId ? (totalSeats > 90 ? 4.2 : totalSeats > 40 ? 5.2 : 6.5) : (totalSeats > 90 ? 2.5 : totalSeats > 40 ? 3.0 : 3.5);
+                    const seatStrokeW = totalSeats > 90 ? 0.7 : totalSeats > 40 ? 0.9 : 1.2;
+
+                    return (
+                      <g key="seating-group">
+                        {/* Canvas Row Labels & Row Delete Action Buttons */}
+                        {isSelected && Object.entries(rowGroups).map(([rowLabel, rowSeats]) => {
+                          const minX = Math.min(...rowSeats.map((st) => st.x));
+                          const rowY = rowSeats[0].y;
+                          const isRowDisabled = rowSeats.every((st) => disabledList.includes(`${st.row}-${st.number}`));
+
+                          return (
+                            <g key={`row-header-${rowLabel}`} style={{ cursor: 'pointer' }} onClick={(e) => {
                               e.stopPropagation();
-                              handleToggleSeat(s.id, seat.row, seat.number);
-                            }
-                          }}
-                        >
-                          <title>{`Seat ${seat.row}-${seat.number} (${isDisabled ? 'Disabled' : 'Active'})`}</title>
-                        </circle>
-                      );
-                    });
+                              handleToggleRow(s.id, rowLabel);
+                            }}>
+                              <text
+                                x={minX - 18}
+                                y={rowY + 3.5}
+                                textAnchor="end"
+                                fill={isRowDisabled ? "rgba(239,68,68,0.6)" : "rgba(255,255,255,0.4)"}
+                                fontSize="7.5"
+                                fontWeight="600"
+                                fontFamily="JetBrains Mono, monospace"
+                              >
+                                {rowLabel} {isRowDisabled ? '✕' : '🗑'}
+                              </text>
+                            </g>
+                          );
+                        })}
+
+                        {/* Seats with Inset Boundary Hitbox Stroke */}
+                        {potentialSeats.map((seat, si) => {
+                          const isDisabled = disabledList.includes(`${seat.row}-${seat.number}`);
+                          const strokeColor = isDisabled ? "rgba(239,68,68,0.6)" : "rgba(255,255,255,0.45)";
+
+                          return (
+                            <circle
+                              key={si}
+                              cx={seat.x}
+                              cy={seat.y}
+                              r={seatR}
+                              fill={isDisabled ? "rgba(239, 68, 68, 0.25)" : s.color}
+                              stroke={strokeColor}
+                              strokeWidth={seatStrokeW}
+                              strokeDasharray={isDisabled ? "2.5 1.5" : undefined}
+                              fillOpacity={isDisabled ? 0.25 : 0.85}
+                              className="hover:scale-125 transition-transform"
+                              style={{
+                                cursor: selectedSectionId ? 'pointer' : 'default',
+                                transition: 'all 0.15s ease',
+                                pointerEvents: selectedSectionId ? 'auto' : 'none',
+                                transformOrigin: 'center',
+                                transformBox: 'fill-box',
+                              }}
+                              onClick={(e) => {
+                                if (selectedSectionId) {
+                                  e.stopPropagation();
+                                  handleToggleSeat(s.id, seat.row, seat.number);
+                                }
+                              }}
+                            >
+                              <title>{`Row ${seat.row} · Seat ${seat.number} (${isDisabled ? 'Disabled/Deleted - Click to restore' : 'Active - Click to disable'})`}</title>
+                            </circle>
+                          );
+                        })}
+                      </g>
+                    );
                   })()}
 
                   {/* Section Label (rendered if not zoomed into another section) */}
@@ -337,13 +435,13 @@ function SeatEditorWorkspace() {
                     </g>
                   )}
 
-                  {/* Bounding shape contour */}
+                  {/* Bounding shape contour with dynamic border stroke scaling */}
                   <path
                     d={path}
-                    fill={s.color}
-                    fillOpacity={selectedSectionId ? (isSelected ? 0.08 : 0.02) : 0.18}
-                    stroke={s.color}
-                    strokeWidth={isSelected ? 2 : 1}
+                    fill={s.shapeType === 'STAGE' ? '#312e81' : s.color}
+                    fillOpacity={s.shapeType === 'STAGE' ? 0.85 : (selectedSectionId ? (isSelected ? 0.08 : 0.02) : 0.18)}
+                    stroke={s.shapeType === 'STAGE' ? '#818cf8' : s.color}
+                    strokeWidth={isSelected ? (s.rowCount * s.seatsPerRow > 90 ? 1.0 : s.rowCount * s.seatsPerRow > 40 ? 1.4 : 2.0) : 1.5}
                     strokeDasharray={selectedSectionId && !isSelected ? "3 3" : undefined}
                     style={{
                       cursor: selectedSectionId ? 'default' : 'pointer',
@@ -376,123 +474,147 @@ function SeatEditorWorkspace() {
                 </button>
               </div>
 
-              {/* Base Info metrics */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-white/[0.03] rounded-xl p-3 border border-white/[0.04]">
-                  <span className="text-[10px] text-slate-400 block">Row Count</span>
-                  <span className="text-sm font-bold mt-0.5">{selectedSection.rowCount}</span>
+              {selectedSection.shapeType === 'STAGE' ? (
+                <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 flex flex-col gap-2.5 text-indigo-300">
+                  <div className="flex items-center gap-2 font-semibold text-white">
+                    <Grid3X3 size={16} className="text-indigo-400" />
+                    <span>Stage Landmark</span>
+                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    This element represents the venue stage landmark for spatial positioning. A stage contains 0 seats and possesses no price or booking attributes.
+                  </p>
                 </div>
-                <div className="bg-white/[0.03] rounded-xl p-3 border border-white/[0.04]">
-                  <span className="text-[10px] text-slate-400 block">Seats Per Row</span>
-                  <span className="text-sm font-bold mt-0.5">{selectedSection.seatsPerRow}</span>
-                </div>
-              </div>
+              ) : (
+                <>
+                  {/* Base Info metrics */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-white/[0.03] rounded-xl p-3 border border-white/[0.04]">
+                      <span className="text-[10px] text-slate-400 block">Row Count</span>
+                      <span className="text-sm font-bold mt-0.5">{selectedSection.rowCount}</span>
+                    </div>
+                    <div className="bg-white/[0.03] rounded-xl p-3 border border-white/[0.04]">
+                      <span className="text-[10px] text-slate-400 block">Seats Per Row</span>
+                      <span className="text-sm font-bold mt-0.5">{selectedSection.seatsPerRow}</span>
+                    </div>
+                  </div>
 
-              {/* Clip to Boundary Toggle */}
-              <div className="flex items-center gap-2 mt-1">
-                <input
-                  type="checkbox"
-                  id="clipToBoundary"
-                  checked={selectedSection.geometry.clipToBoundary !== false}
-                  onChange={(e) => {
-                    const updatedGeom = {
-                      ...selectedSection.geometry,
-                      clipToBoundary: e.target.checked,
-                    };
-                    updateSection(selectedSection.id, {
-                      geometry: updatedGeom,
-                    });
-                  }}
-                  className="w-4 h-4 rounded border-white/[0.08] bg-white/[0.06] text-indigo-600 focus:ring-indigo-500/50 cursor-pointer"
-                />
-                <label htmlFor="clipToBoundary" className="text-xs text-slate-300 cursor-pointer select-none">
-                  Clip seats to shape boundary
-                </label>
-              </div>
-
-              {/* Row configuration adjusters */}
-              <div className="border border-white/[0.08] rounded-xl p-3 flex flex-col gap-2">
-                <span className="text-xs font-semibold text-slate-300">Adjust Seats per Row</span>
-                <div className="max-h-56 overflow-y-auto flex flex-col gap-2 pr-1">
-                  {Array.from({ length: selectedSection.rowCount }).map((_, r) => {
-                    const rowLabel = getRowLabel(r);
-                    const rowConfigs = selectedSection.geometry.rowConfigs || [];
-                    const rowConfig = rowConfigs.find((rc) => rc.row === rowLabel);
-                    const currentCount = rowConfig ? rowConfig.seatCount : selectedSection.seatsPerRow;
-
-                    const handleUpdateRowCount = (newCount: number) => {
-                      const count = Math.max(1, Math.min(50, newCount));
-                      let updatedConfigs = [...rowConfigs];
-                      const idx = updatedConfigs.findIndex((rc) => rc.row === rowLabel);
-                      if (idx >= 0) {
-                        updatedConfigs[idx] = { row: rowLabel, seatCount: count };
-                      } else {
-                        updatedConfigs.push({ row: rowLabel, seatCount: count });
-                      }
-                      updateSection(selectedSection.id, {
-                        geometry: {
+                  {/* Clip to Boundary Toggle */}
+                  <div className="flex items-center gap-2 mt-1">
+                    <input
+                      type="checkbox"
+                      id="clipToBoundary"
+                      checked={selectedSection.geometry.clipToBoundary !== false}
+                      onChange={(e) => {
+                        const updatedGeom = {
                           ...selectedSection.geometry,
-                          rowConfigs: updatedConfigs,
-                        },
-                      });
-                    };
+                          clipToBoundary: e.target.checked,
+                        };
+                        updateSection(selectedSection.id, {
+                          geometry: updatedGeom,
+                        });
+                      }}
+                      className="w-4 h-4 rounded border-white/[0.08] bg-white/[0.06] text-indigo-600 focus:ring-indigo-500/50 cursor-pointer"
+                    />
+                    <label htmlFor="clipToBoundary" className="text-xs text-slate-300 cursor-pointer select-none">
+                      Clip seats to shape boundary
+                    </label>
+                  </div>
 
-                    return (
-                      <div key={rowLabel} className="flex items-center justify-between text-xs py-1 border-b border-white/[0.04]">
-                        <span className="text-slate-400 font-medium">Row {rowLabel}</span>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => handleUpdateRowCount(currentCount - 1)}
-                            className="w-5 h-5 rounded bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-300 transition-colors"
-                          >
-                            -
-                          </button>
-                          <input
-                            type="number"
-                            value={currentCount}
-                            onChange={(e) => handleUpdateRowCount(Number(e.target.value))}
-                            className="w-10 bg-white/[0.04] text-center text-white py-0.5 rounded border border-white/[0.06] outline-none text-[10px]"
-                          />
-                          <button
-                            onClick={() => handleUpdateRowCount(currentCount + 1)}
-                            className="w-5 h-5 rounded bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-300 transition-colors"
-                          >
-                            +
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+                  {/* Row configuration adjusters */}
+                  <div className="border border-white/[0.08] rounded-xl p-3 flex flex-col gap-2">
+                    <span className="text-xs font-semibold text-slate-300">Adjust Seats per Row</span>
+                    <div className="max-h-56 overflow-y-auto flex flex-col gap-2 pr-1">
+                      {Array.from({ length: selectedSection.rowCount }).map((_, r) => {
+                        const rowLabel = getRowLabel(r);
+                        const rowConfigs = selectedSection.geometry.rowConfigs || [];
+                        const rowConfig = rowConfigs.find((rc) => rc.row === rowLabel);
+                        const currentCount = rowConfig ? rowConfig.seatCount : selectedSection.seatsPerRow;
 
-              {/* Reset Section Customization button */}
-              {((selectedSection.geometry.rowConfigs && selectedSection.geometry.rowConfigs.length > 0) || 
-                (selectedSection.geometry.disabledSeats && selectedSection.geometry.disabledSeats.length > 0) ||
-                selectedSection.geometry.clipToBoundary === false) && (
-                <button
-                  onClick={() => {
-                    updateSection(selectedSection.id, {
-                      geometry: {
-                        ...selectedSection.geometry,
-                        rowConfigs: [],
-                        disabledSeats: [],
-                        clipToBoundary: true,
-                      },
-                    });
-                  }}
-                  className="w-full py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 rounded-lg text-xs font-semibold transition-all"
-                >
-                  Reset Custom Grid
-                </button>
+                        const handleUpdateRowCount = (newCount: number) => {
+                          const count = Math.max(1, Math.min(50, newCount));
+                          let updatedConfigs = [...rowConfigs];
+                          const idx = updatedConfigs.findIndex((rc) => rc.row === rowLabel);
+                          if (idx >= 0) {
+                            updatedConfigs[idx] = { row: rowLabel, seatCount: count };
+                          } else {
+                            updatedConfigs.push({ row: rowLabel, seatCount: count });
+                          }
+                          updateSection(selectedSection.id, {
+                            geometry: {
+                              ...selectedSection.geometry,
+                              rowConfigs: updatedConfigs,
+                            },
+                          });
+                        };
+
+                        return (
+                          <div key={rowLabel} className="flex items-center justify-between text-xs py-1 border-b border-white/[0.04]">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-slate-400 font-medium">Row {rowLabel}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleRow(selectedSection.id, rowLabel)}
+                                className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition-colors"
+                                title={`Toggle delete/restore full Row ${rowLabel}`}
+                              >
+                                Delete Row
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => handleUpdateRowCount(currentCount - 1)}
+                                className="w-5 h-5 rounded bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-300 transition-colors"
+                              >
+                                -
+                              </button>
+                              <input
+                                type="number"
+                                value={currentCount}
+                                onChange={(e) => handleUpdateRowCount(Number(e.target.value))}
+                                className="w-10 bg-white/[0.04] text-center text-white py-0.5 rounded border border-white/[0.06] outline-none text-[10px]"
+                              />
+                              <button
+                                onClick={() => handleUpdateRowCount(currentCount + 1)}
+                                className="w-5 h-5 rounded bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-300 transition-colors"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Reset Section Customization button */}
+                  {((selectedSection.geometry.rowConfigs && selectedSection.geometry.rowConfigs.length > 0) || 
+                    (selectedSection.geometry.disabledSeats && selectedSection.geometry.disabledSeats.length > 0) ||
+                    selectedSection.geometry.clipToBoundary === false) && (
+                    <button
+                      onClick={() => {
+                        updateSection(selectedSection.id, {
+                          geometry: {
+                            ...selectedSection.geometry,
+                            rowConfigs: [],
+                            disabledSeats: [],
+                            clipToBoundary: true,
+                          },
+                        });
+                      }}
+                      className="w-full py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 rounded-lg text-xs font-semibold transition-all"
+                    >
+                      Reset Custom Grid
+                    </button>
+                  )}
+
+                  {/* Metric indicator */}
+                  <div className="bg-white/[0.04] rounded-xl px-3 py-2.5 mt-auto">
+                    <p className="text-[10px] text-slate-400">Total Bookable Seats</p>
+                    <p className="text-xl font-bold text-white mt-0.5">{selectedSection.seats.length}</p>
+                    <p className="text-[9px] text-slate-500">Excluding disabled aisles / layout gaps</p>
+                  </div>
+                </>
               )}
-
-              {/* Metric indicator */}
-              <div className="bg-white/[0.04] rounded-xl px-3 py-2.5 mt-auto">
-                <p className="text-[10px] text-slate-400">Total Bookable Seats</p>
-                <p className="text-xl font-bold text-white mt-0.5">{selectedSection.seats.length}</p>
-                <p className="text-[9px] text-slate-500">Excluding disabled aisles / layout gaps</p>
-              </div>
 
               {/* Back to map action */}
               <button

@@ -103,7 +103,7 @@ test.describe('R1. Modular Section Map Visualizer E2E Tests', () => {
   test('R1.4: should smoothly zoom viewBox into clicked section bounding box', async ({ page }) => {
     await page.goto('/events/event-concert-1');
 
-    const svgMap = page.locator('svg[data-testid="venue-svg-map"], svg.venue-map');
+    const svgMap = page.locator('svg[data-testid="venue-svg-map"]').first();
     const initialViewBox = await svgMap.getAttribute('viewBox');
     expect(initialViewBox).toBe('0 0 1200 800');
 

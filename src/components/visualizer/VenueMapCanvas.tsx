@@ -48,6 +48,7 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
   }, [tooltip, vbW, vbH]);
 
   const handleSectionMouseEnter = useCallback((section: SectionDTO, e: React.MouseEvent) => {
+    if (section.shapeType === 'STAGE' || section.geometry?.shapeType === 'STAGE') return;
     if (!svgRef.current) return;
     const rect = svgRef.current.getBoundingClientRect();
     const scaleX = vbW / rect.width;
@@ -113,14 +114,6 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
         </defs>
         <rect width={vbW} height={vbH} fill="url(#grid)" />
 
-        {/* Stage */}
-        <rect x={vbW * 0.3} y={vbH * 0.85} width={vbW * 0.4} height={vbH * 0.07}
-          rx="4" fill="rgba(99,102,241,0.15)" stroke="rgba(99,102,241,0.4)" strokeWidth="1" />
-        <text x={vbW * 0.5} y={vbH * 0.895} textAnchor="middle" fill="rgba(99,102,241,0.7)"
-          fontSize="14" fontWeight="600" fontFamily="Inter, sans-serif" letterSpacing="3">
-          STAGE
-        </text>
-
         {/* Sections */}
         {sections.map((section) => {
           const pts = section.geometry.points?.length >= 3
@@ -141,13 +134,44 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
           const isSelected = selectedSectionId === section.id;
           const opacity = getSectionOpacity(section);
           const grade = getAvailabilityGrade(section);
-
           const ringColor = grade === 0 ? '#ef4444' : grade < 0.3 ? '#f59e0b' : '#22d3ee';
+
+          const isStage = section.shapeType === 'STAGE' || section.geometry?.shapeType === 'STAGE';
+
+          if (isStage) {
+            return (
+              <g key={section.id} style={{ pointerEvents: 'none' }}>
+                <path
+                  d={path}
+                  data-testid={`section-shape-${section.id}`}
+                  data-shape="STAGE"
+                  fill="#312e81"
+                  fillOpacity="0.85"
+                  stroke="#818cf8"
+                  strokeWidth="2.5"
+                  filter="url(#glow-filter)"
+                />
+                <text
+                  x={centroid.x}
+                  y={centroid.y + 4}
+                  textAnchor="middle"
+                  fill="#ffffff"
+                  fontSize={Math.max(10, Math.min(bbox.width, bbox.height) * 0.18)}
+                  fontWeight="800"
+                  letterSpacing="2"
+                  fontFamily="Inter, sans-serif"
+                  style={{ pointerEvents: 'none', userSelect: 'none' }}
+                >
+                  STAGE
+                </text>
+              </g>
+            );
+          }
 
           return (
             <g
               key={section.id}
-              className="venue-section section-group"
+              className="venue-section section-group cursor-pointer"
               data-testid="section-shape"
               onClick={() => onSectionSelect(section)}
               onMouseEnter={(e) => handleSectionMouseEnter(section, e)}
@@ -189,7 +213,6 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
                 ${section.price}
               </text>
 
-              {/* Fill Path (drawn on top so Playwright hits this directly without circle intercept errors) */}
               <path
                 d={path}
                 data-testid={`section-shape-${section.id}`}
@@ -201,6 +224,7 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
                 strokeWidth={isSelected ? 2.5 : isHovered ? 2 : 1}
                 filter={isHovered || isSelected ? 'url(#glow-filter)' : undefined}
                 style={{ transition: 'all 0.2s ease', cursor: 'pointer' }}
+                onClick={() => onSectionSelect(section)}
               />
             </g>
           );

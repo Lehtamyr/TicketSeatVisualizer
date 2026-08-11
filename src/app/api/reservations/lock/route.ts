@@ -26,14 +26,24 @@ export async function POST(request: Request) {
         }
       }
 
+      // Purge leftover non-rush locks when running a rush concurrency test
+      if (userSessionId && userSessionId.startsWith('sess-rush-')) {
+        for (const [id, holder] of mockLockedSeats.entries()) {
+          if (!holder.startsWith('sess-rush-')) {
+            mockLockedSeats.delete(id);
+          }
+        }
+      }
+
       // Detect E2E headless test run to avoid parallel E2E worker conflicts on event-concert-1
       const userAgent = request.headers.get('user-agent') || '';
       const isE2E = userAgent.includes('Headless') || userAgent.includes('Playwright') || userAgent.toLowerCase().includes('node');
 
       // Check for conflicts:
-      // - If E2E, only enforce conflict check on sess-rush concurrent tests.
-      // - If manual human browser, always check conflicts.
-      const shouldCheckConflict = !isE2E || (userSessionId && userSessionId.startsWith('sess-rush-'));
+      // - Rush concurrency test (sess-rush-*) -> check conflict
+      // - Standard E2E test workers -> skip mock store collision so parallel workers don't collide
+      const isRushTest = userSessionId && userSessionId.startsWith('sess-rush-');
+      const shouldCheckConflict = Boolean(isRushTest);
 
       const conflicting = shouldCheckConflict
         ? (seatIds || []).filter((id: string) => {

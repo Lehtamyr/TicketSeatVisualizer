@@ -36,19 +36,23 @@ export async function getEvents(): Promise<EventDTO[]> {
     endTime: e.endTime?.toISOString() ?? null,
     viewBoxWidth: e.viewBoxWidth,
     viewBoxHeight: e.viewBoxHeight,
-    sections: e.sections.map((s) => ({
-      id: s.id,
-      name: s.name,
-      code: s.code,
-      shapeType: s.shapeType as SectionDTO['shapeType'],
-      geometry: parseGeometry(s.geometry),
-      price: Number(s.price),
-      color: s.color,
-      tierName: s.pricingTier?.name,
-      tierColor: s.pricingTier?.color,
-      totalSeats: s._count.seats,
-      availableSeats: s.seats.length,
-    })),
+    sections: e.sections.map((s) => {
+      const geom = parseGeometry(s.geometry);
+      const isStage = s.shapeType === 'STAGE' || geom?.shapeType === 'STAGE';
+      return {
+        id: s.id,
+        name: s.name,
+        code: s.code,
+        shapeType: (isStage ? 'STAGE' : s.shapeType) as SectionDTO['shapeType'],
+        geometry: geom,
+        price: isStage ? 0 : Number(s.price),
+        color: s.color,
+        tierName: s.pricingTier?.name,
+        tierColor: s.pricingTier?.color,
+        totalSeats: isStage ? 0 : s._count.seats,
+        availableSeats: isStage ? 0 : s.seats.length,
+      };
+    }),
   }));
 }
 
@@ -80,18 +84,22 @@ export async function getEventById(eventId: string): Promise<EventDTO | null> {
     endTime: event.endTime?.toISOString() ?? null,
     viewBoxWidth: event.viewBoxWidth,
     viewBoxHeight: event.viewBoxHeight,
-    sections: event.sections.map((s) => ({
-      id: s.id,
-      name: s.name,
-      code: s.code,
-      shapeType: s.shapeType as SectionDTO['shapeType'],
-      geometry: parseGeometry(s.geometry),
-      price: Number(s.price),
-      color: s.color,
-      tierName: s.pricingTier?.name,
-      tierColor: s.pricingTier?.color,
-      totalSeats: s._count.seats,
-      availableSeats: s.seats.length,
-    })),
+    sections: event.sections.map((s) => {
+      const geom = parseGeometry(s.geometry);
+      const isStage = s.shapeType === 'STAGE' || geom?.shapeType === 'STAGE';
+      return {
+        id: s.id,
+        name: s.name,
+        code: s.code,
+        shapeType: (isStage ? 'STAGE' : s.shapeType) as SectionDTO['shapeType'],
+        geometry: geom,
+        price: isStage ? 0 : Number(s.price),
+        color: s.color,
+        tierName: s.pricingTier?.name,
+        tierColor: s.pricingTier?.color,
+        totalSeats: isStage ? 0 : s._count.seats,
+        availableSeats: isStage ? 0 : s.seats.length,
+      };
+    }),
   };
 }

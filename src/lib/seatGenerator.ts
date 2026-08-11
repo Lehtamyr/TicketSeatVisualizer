@@ -1,5 +1,5 @@
 import { Point, SectionGeometry } from '@/types/venue';
-import { calculateBoundingBox, isSeatCircleValid } from './geometry';
+import { calculateBoundingBox, isSeatCircleValid, isPointInPolygon } from './geometry';
 
 export interface SeatGeneratorOptions {
   polygon?: Point[];
@@ -68,7 +68,7 @@ export function getPolygonHorizontalSpanAtY(y: number, polygon: Point[], pad = 0
  * Guarantees 100% of returned seats lie strictly inside the polygon using PIP circle validation.
  */
 export function generateSeatGrid(options: SeatGeneratorOptions): GeneratedSeat[] {
-  if (!options) return [];
+  if (!options || options.geometry?.shapeType === 'STAGE' || (options as any).shapeType === 'STAGE') return [];
 
   const {
     rowCount,
@@ -123,7 +123,12 @@ export function generateSeatGrid(options: SeatGeneratorOptions): GeneratedSeat[]
   const startY = minY + pad;
   const endY = maxY - pad;
 
-  const rowStep = rowCount > 1 ? (endY - startY) / (rowCount - 1) : 0;
+  const minRowStep = seatRadius * 2 + 8;
+  const minStep = seatRadius * 2 + 6;
+
+  const rawRowStep = rowCount > 1 ? (endY - startY) / (rowCount - 1) : 0;
+  const rowStep = rawRowStep;
+
   const seats: GeneratedSeat[] = [];
 
   const rowConfigs = options.geometry?.rowConfigs || [];
@@ -147,7 +152,8 @@ export function generateSeatGrid(options: SeatGeneratorOptions): GeneratedSeat[]
       }
     }
 
-    const step = seatsInRow > 1 ? (rowEndX - rowStartX) / (seatsInRow - 1) : 0;
+    const rawStep = seatsInRow > 1 ? (rowEndX - rowStartX) / (seatsInRow - 1) : 0;
+    const step = rawStep;
 
     for (let c = 0; c < seatsInRow; c++) {
       const candidateX = seatsInRow === 1 ? (rowStartX + rowEndX) / 2 : rowStartX + c * step;
@@ -156,13 +162,12 @@ export function generateSeatGrid(options: SeatGeneratorOptions): GeneratedSeat[]
       const seatNum = c + 1;
       const seatId = `${rowLabel}-${seatNum}`;
 
-      // 1. Skip if manually disabled/deleted by the user
+      // Skip if manually disabled or outside boundary when clipping is enabled
       if (disabledSeats.includes(seatId)) {
         continue;
       }
 
-      // 2. Skip if boundary clipping is enabled and seat lies outside the polygon boundary
-      if (clipToBoundary && !isSeatCircleValid(center, seatRadius, polygon, tolerance)) {
+      if (clipToBoundary && polygon.length >= 3 && !isPointInPolygon(center, polygon, false)) {
         continue;
       }
 

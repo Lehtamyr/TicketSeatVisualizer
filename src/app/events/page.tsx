@@ -77,15 +77,15 @@ export default async function EventsPage() {
                 </div>
 
                 <div className="mt-4 flex items-center gap-2 flex-wrap">
-                  {event.sections.slice(0, 5).map((sec) => (
+                  {event.sections.filter((sec) => sec.shapeType !== 'STAGE' && sec.geometry?.shapeType !== 'STAGE').slice(0, 5).map((sec) => (
                     <span key={sec.id}
                       className="text-xs px-2 py-0.5 rounded-full font-medium"
                       style={{ background: `${sec.color}25`, color: sec.color, border: `1px solid ${sec.color}40` }}>
                       {sec.code}
                     </span>
                   ))}
-                  {event.sections.length > 5 && (
-                    <span className="text-xs text-slate-500">+{event.sections.length - 5} more</span>
+                  {event.sections.filter((sec) => sec.shapeType !== 'STAGE' && sec.geometry?.shapeType !== 'STAGE').length > 5 && (
+                    <span className="text-xs text-slate-500">+{event.sections.filter((sec) => sec.shapeType !== 'STAGE' && sec.geometry?.shapeType !== 'STAGE').length - 5} more</span>
                   )}
                 </div>
               </Link>

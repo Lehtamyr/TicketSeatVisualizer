@@ -9,8 +9,8 @@ export async function saveLayoutAction(input: SaveLayoutInput): Promise<{ succes
     // Pre-process sections so CPU calculations happen before opening DB transaction
     const processedSections = input.sections.map((sec) => {
       let seatsToCreate = sec.seats;
-      if (!seatsToCreate || seatsToCreate.length === 0) {
-        if (sec.rowCount > 0 && sec.seatsPerRow > 0) {
+      if (sec.shapeType === 'STAGE' || !seatsToCreate || seatsToCreate.length === 0) {
+        if (sec.shapeType !== 'STAGE' && sec.rowCount > 0 && sec.seatsPerRow > 0) {
           seatsToCreate = generateSeatGrid({
             geometry: sec.geometry,
             rowCount: sec.rowCount,
@@ -54,17 +54,22 @@ export async function saveLayoutAction(input: SaveLayoutInput): Promise<{ succes
 
         // Re-create sections and their seats
         for (const sec of processedSections) {
+          const isStage = sec.shapeType === 'STAGE';
+          const dbShapeType = sec.shapeType;
+          const geomObj = typeof sec.geometry === 'string' ? JSON.parse(sec.geometry) : sec.geometry;
+          const geomToSave = JSON.stringify({ ...geomObj, shapeType: sec.shapeType, clipToBoundary: false });
+
           const section = await tx.section.create({
             data: {
               layoutId: layout.id,
               name: sec.name,
               code: sec.code,
-              shapeType: sec.shapeType,
-              geometry: JSON.stringify(sec.geometry),
-              price: sec.price,
+              shapeType: dbShapeType as any,
+              geometry: geomToSave,
+              price: isStage ? 0 : sec.price,
               color: sec.color,
-              rowCount: sec.rowCount,
-              seatsPerRow: sec.seatsPerRow,
+              rowCount: isStage ? 0 : sec.rowCount,
+              seatsPerRow: isStage ? 0 : sec.seatsPerRow,
             },
           });
 

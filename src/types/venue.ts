@@ -1,5 +1,5 @@
 export interface Point { x: number; y: number; }
-export type ShapeType = 'RECTANGLE' | 'SQUARE' | 'TRIANGLE' | 'POLYGON' | 'CIRCLE';
+export type ShapeType = 'RECTANGLE' | 'SQUARE' | 'TRIANGLE' | 'POLYGON' | 'CIRCLE' | 'STAGE';
 
 export interface SectionGeometry {
   shapeType: ShapeType;
