@@ -785,6 +785,223 @@ async function main() {
     })),
   });
 
+  // ----------------------------------------------------
+  // MOCK EVENT: event-concert-1 (fixed IDs for E2E + browser testing)
+  // ----------------------------------------------------
+
+  // Delete existing mock event data so we can recreate with exact IDs
+  const existingMockEvent = await prisma.event.findUnique({ where: { id: 'event-concert-1' } });
+  if (existingMockEvent) {
+    await prisma.reservationSeat.deleteMany({
+      where: { reservation: { eventId: 'event-concert-1' } },
+    });
+    await prisma.reservation.deleteMany({ where: { eventId: 'event-concert-1' } });
+    await prisma.seat.deleteMany({ where: { section: { eventId: 'event-concert-1' } } });
+    await prisma.section.deleteMany({ where: { eventId: 'event-concert-1' } });
+    await prisma.event.delete({ where: { id: 'event-concert-1' } });
+  }
+
+  await prisma.event.create({
+    data: {
+      id: 'event-concert-1',
+      title: 'Summer Symphony Concert 2026',
+      description: 'Live classical performance in the Grand Arena',
+      venueName: 'Metropolitan Stadium',
+      startTime: new Date('2026-09-15T19:00:00Z'),
+      endTime: new Date('2026-09-15T22:00:00Z'),
+      viewBoxWidth: 1200,
+      viewBoxHeight: 800,
+    },
+  });
+
+  // Section sec-rect-101 — Main Orchestra Rect (RECTANGLE)
+  await prisma.section.create({
+    data: {
+      id: 'sec-rect-101',
+      eventId: 'event-concert-1',
+      name: 'Main Orchestra Rect',
+      code: 'ORCH-R',
+      shapeType: ShapeType.RECTANGLE,
+      geometry: JSON.stringify({
+        shapeType: 'RECTANGLE',
+        x: 100,
+        y: 100,
+        width: 400,
+        height: 250,
+        points: [
+          { x: 100, y: 100 },
+          { x: 500, y: 100 },
+          { x: 500, y: 350 },
+          { x: 100, y: 350 },
+        ],
+      }),
+      price: 75.00,
+      color: '#3B82F6',
+      rowCount: 4,
+      seatsPerRow: 5,
+      pricingTierId: standardTier.id,
+    },
+  });
+
+  await prisma.seat.createMany({
+    data: Array.from({ length: 20 }, (_, i) => ({
+      id: `seat-rect-${i + 1}`,
+      sectionId: 'sec-rect-101',
+      row: String.fromCharCode(65 + Math.floor(i / 5)),
+      number: (i % 5) + 1,
+      x: 130 + (i % 5) * 55,
+      y: 130 + Math.floor(i / 5) * 55,
+      status: SeatStatus.AVAILABLE,
+      pricingTierId: standardTier.id,
+    })),
+  });
+
+  // Section sec-sq-102 — VIP Square Section (SQUARE)
+  await prisma.section.create({
+    data: {
+      id: 'sec-sq-102',
+      eventId: 'event-concert-1',
+      name: 'VIP Square Section',
+      code: 'VIP-SQ',
+      shapeType: ShapeType.SQUARE,
+      geometry: JSON.stringify({
+        shapeType: 'SQUARE',
+        x: 550,
+        y: 100,
+        width: 200,
+        height: 200,
+        points: [
+          { x: 550, y: 100 },
+          { x: 750, y: 100 },
+          { x: 750, y: 300 },
+          { x: 550, y: 300 },
+        ],
+      }),
+      price: 150.00,
+      color: '#EAB308',
+      rowCount: 4,
+      seatsPerRow: 4,
+      pricingTierId: vipTier.id,
+    },
+  });
+
+  await prisma.seat.createMany({
+    data: Array.from({ length: 16 }, (_, i) => ({
+      id: `seat-sq-${i + 1}`,
+      sectionId: 'sec-sq-102',
+      row: String.fromCharCode(65 + Math.floor(i / 4)),
+      number: (i % 4) + 1,
+      x: 570 + (i % 4) * 45,
+      y: 120 + Math.floor(i / 4) * 45,
+      status: SeatStatus.AVAILABLE,
+      pricingTierId: vipTier.id,
+    })),
+  });
+
+  // Section sec-tri-103 — Economy Triangle (TRIANGLE)
+  await prisma.section.create({
+    data: {
+      id: 'sec-tri-103',
+      eventId: 'event-concert-1',
+      name: 'Economy Triangle',
+      code: 'ECO-TRI',
+      shapeType: ShapeType.TRIANGLE,
+      geometry: JSON.stringify({
+        shapeType: 'TRIANGLE',
+        points: [
+          { x: 800, y: 100 },
+          { x: 1000, y: 100 },
+          { x: 900, y: 300 },
+        ],
+      }),
+      price: 40.00,
+      color: '#10B981',
+      rowCount: 3,
+      seatsPerRow: 4,
+      pricingTierId: economyTier.id,
+    },
+  });
+
+  await prisma.seat.createMany({
+    data: Array.from({ length: 12 }, (_, i) => ({
+      id: `seat-tri-${i + 1}`,
+      sectionId: 'sec-tri-103',
+      row: String.fromCharCode(65 + Math.floor(i / 4)),
+      number: (i % 4) + 1,
+      x: 820 + (i % 4) * 40,
+      y: 120 + Math.floor(i / 4) * 60,
+      status: SeatStatus.AVAILABLE,
+      pricingTierId: economyTier.id,
+    })),
+  });
+
+  // Section sec-poly-104 — Premium Polygon (POLYGON)
+  await prisma.section.create({
+    data: {
+      id: 'sec-poly-104',
+      eventId: 'event-concert-1',
+      name: 'Premium Polygon',
+      code: 'PREM-POLY',
+      shapeType: ShapeType.POLYGON,
+      geometry: JSON.stringify({
+        shapeType: 'POLYGON',
+        points: [
+          { x: 100, y: 400 },
+          { x: 400, y: 380 },
+          { x: 450, y: 550 },
+          { x: 200, y: 600 },
+          { x: 50, y: 530 },
+        ],
+      }),
+      price: 90.00,
+      color: '#8B5CF6',
+      rowCount: 3,
+      seatsPerRow: 5,
+      pricingTierId: premiumTier.id,
+    },
+  });
+
+  await prisma.seat.createMany({
+    data: Array.from({ length: 15 }, (_, i) => ({
+      id: `seat-poly-${i + 1}`,
+      sectionId: 'sec-poly-104',
+      row: String.fromCharCode(65 + Math.floor(i / 5)),
+      number: (i % 5) + 1,
+      x: 120 + (i % 5) * 60,
+      y: 420 + Math.floor(i / 5) * 60,
+      status: SeatStatus.AVAILABLE,
+      pricingTierId: premiumTier.id,
+    })),
+  });
+
+  // Stage section for event-concert-1
+  await prisma.section.create({
+    data: {
+      id: 'sec-stage-concert-1',
+      eventId: 'event-concert-1',
+      name: 'Stage',
+      code: 'STAGE',
+      shapeType: ShapeType.STAGE,
+      geometry: JSON.stringify({
+        shapeType: 'STAGE',
+        x: 350,
+        y: 640,
+        width: 500,
+        height: 100,
+        points: [
+          { x: 350, y: 640 },
+          { x: 850, y: 640 },
+          { x: 850, y: 740 },
+          { x: 350, y: 740 },
+        ],
+      }),
+      price: 0,
+      color: '#6B7280',
+      rowCount: 0,
+      seatsPerRow: 0,
+    },
+  });
+
   console.log('✅ Database seeding finished successfully.');
 }
 

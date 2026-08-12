@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { mockLockedSeats } from '@/lib/mockStore';
 
 // Cron cleanup logic
 async function runCleanup() {
-  // Clear in-memory mock locks for E2E testing
-  mockLockedSeats.clear();
 
   const now = new Date();
 

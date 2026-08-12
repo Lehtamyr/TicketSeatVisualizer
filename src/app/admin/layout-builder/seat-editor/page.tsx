@@ -51,7 +51,7 @@ function SeatEditorWorkspace() {
   const [canvasWidth, setCanvasWidth] = useState(1000);
   const [canvasHeight, setCanvasHeight] = useState(700);
   const [sections, setSections] = useState<AdminSection[]>([]);
-  
+
   // Selection/zoom view state
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
 
@@ -82,7 +82,7 @@ function SeatEditorWorkspace() {
         const mapped = (data.sections || []).map((s: any) => {
           let geom = s.geometry;
           if (typeof geom === 'string') {
-            try { geom = JSON.parse(geom); } catch {}
+            try { geom = JSON.parse(geom); } catch { }
           }
           if (geom && typeof geom === 'object') {
             geom = { ...geom, clipToBoundary: geom.clipToBoundary === true };
@@ -115,7 +115,7 @@ function SeatEditorWorkspace() {
 
   // Generate seats helper
   const generateSeats = useCallback((geometry: SectionGeometry, rowCount: number, seatsPerRow: number): GeneratedSeat[] => {
-    return generateSeatGrid({ geometry, rowCount, seatsPerRow, seatRadius: 7, padding: 14 });
+    return generateSeatGrid({ geometry: { ...geometry, disabledSeats: [] }, rowCount, seatsPerRow, seatRadius: 7, padding: 14 });
   }, []);
 
   // Update section values
@@ -134,7 +134,7 @@ function SeatEditorWorkspace() {
   const handleToggleSeat = useCallback((sectionId: string, row: string, number: number) => {
     setSections((prev) => prev.map((s) => {
       if (s.id !== sectionId) return s;
-      
+
       const seatKey = `${row}-${number}`;
       const currentDisabled = s.geometry.disabledSeats || [];
       const updatedDisabled = currentDisabled.includes(seatKey)
@@ -278,7 +278,7 @@ function SeatEditorWorkspace() {
           <div className="h-4 w-px bg-white/10" />
           <h1 className="text-sm font-semibold text-white">Seat Simulator & Editor: <span className="text-indigo-400">{layoutName}</span></h1>
         </div>
-        
+
         <div className="flex items-center gap-2">
           {error && <span className="text-xs text-red-400 mr-2">{error}</span>}
           <button
@@ -306,7 +306,7 @@ function SeatEditorWorkspace() {
                   section={selectedSection as any}
                   seats={selectedSection.seats as any}
                   selectedIds={new Set()}
-                  onToggleSeat={() => {}}
+                  onToggleSeat={() => { }}
                   adminMode={true}
                   disabledSeatKeys={selectedSection.geometry.disabledSeats || []}
                   onToggleDisabledSeat={(sectionId, row, number) => handleToggleSeat(sectionId, row, number)}
@@ -517,25 +517,25 @@ function SeatEditorWorkspace() {
                   </div>
 
                   {/* Reset Section Customization button */}
-                  {((selectedSection.geometry.rowConfigs && selectedSection.geometry.rowConfigs.length > 0) || 
+                  {((selectedSection.geometry.rowConfigs && selectedSection.geometry.rowConfigs.length > 0) ||
                     (selectedSection.geometry.disabledSeats && selectedSection.geometry.disabledSeats.length > 0) ||
                     selectedSection.geometry.clipToBoundary === false) && (
-                    <button
-                      onClick={() => {
-                        updateSection(selectedSection.id, {
-                          geometry: {
-                            ...selectedSection.geometry,
-                            rowConfigs: [],
-                            disabledSeats: [],
-                            clipToBoundary: true,
-                          },
-                        });
-                      }}
-                      className="w-full py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 rounded-lg text-xs font-semibold transition-all"
-                    >
-                      Reset Custom Grid
-                    </button>
-                  )}
+                      <button
+                        onClick={() => {
+                          updateSection(selectedSection.id, {
+                            geometry: {
+                              ...selectedSection.geometry,
+                              rowConfigs: [],
+                              disabledSeats: [],
+                              clipToBoundary: true,
+                            },
+                          });
+                        }}
+                        className="w-full py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 rounded-lg text-xs font-semibold transition-all"
+                      >
+                        Reset Custom Grid
+                      </button>
+                    )}
 
                   {/* Metric indicator */}
                   <div className="bg-white/[0.04] rounded-xl px-3 py-2.5 mt-auto">

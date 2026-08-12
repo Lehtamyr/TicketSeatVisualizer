@@ -13,20 +13,46 @@ interface EventVisualizerProps {
   event: EventDTO;
 }
 
+// Session ID lives at module scope — evaluated once when this module is first imported
+// on the client. On the server (SSR) it returns a static placeholder; on the client
+// it reads/writes sessionStorage so every browser tab gets a stable unique ID.
+let _sessionId: string | null = null;
+function getTabSessionId(): string {
+  if (typeof window === 'undefined') return 'sess-ssr';
+  if (_sessionId) return _sessionId;
+  let id = window.sessionStorage.getItem('seat_session_id');
+  if (!id) {
+    id = `sess-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    window.sessionStorage.setItem('seat_session_id', id);
+  }
+  _sessionId = id;
+  return id;
+}
+
 type View = 'map' | 'seats';
 
 export function EventVisualizer({ event }: EventVisualizerProps) {
-  const [sessionId, setSessionId] = useState<string>('anonymous');
+  // getTabSessionId() reads sessionStorage — safe to call during render on client.
+  // On SSR it returns 'sess-ssr' but no lock calls happen server-side.
+  const sessionId = getTabSessionId();
 
-  useEffect(() => {
-    const id = `sess-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-    Promise.resolve().then(() => setSessionId(id));
-  }, []);
   const [view, setView] = useState<View>('map');
   const [selectedSection, setSelectedSection] = useState<SectionDTO | null>(null);
   const [seats, setSeats] = useState<SeatDTO[]>([]);
   const [loadingSeats, setLoadingSeats] = useState(false);
   const [selectedSeatIds, setSelectedSeatIds] = useState<Set<string>>(new Set());
+
+  const fetchLiveSectionSeats = useCallback(async (sectionId: string): Promise<SeatDTO[]> => {
+    try {
+      const freshSeats = await getSectionSeats(sectionId);
+      if (freshSeats && freshSeats.length > 0) {
+        return freshSeats;
+      }
+    } catch (err) {
+      console.error('Failed to fetch live section seats:', err);
+    }
+    return [];
+  }, []);
 
   const handleSectionSelect = useCallback(async (section: SectionDTO) => {
     if (section.shapeType === 'STAGE' || section.geometry?.shapeType === 'STAGE') return;
@@ -34,15 +60,9 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
     setView('seats');
     setSelectedSeatIds(new Set());
 
-    // If section already has seats (e.g. mock data in E2E tests)
-    if ((section as any).seats && (section as any).seats.length > 0) {
-      setSeats((section as any).seats);
-      return;
-    }
-
     setLoadingSeats(true);
     try {
-      const loaded = await getSectionSeats(section.id);
+      const loaded = await fetchLiveSectionSeats(section.id);
       if (loaded && loaded.length > 0) {
         setSeats(loaded);
       } else if ((section as any).seats && (section as any).seats.length > 0) {
@@ -58,7 +78,7 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
     } finally {
       setLoadingSeats(false);
     }
-  }, []);
+  }, [fetchLiveSectionSeats]);
 
   const lastLockedIdsRef = useRef<string[]>([]);
   const [lockError, setLockError] = useState<string | null>(null);
@@ -96,21 +116,23 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
     // Refresh seats
     lastLockedIdsRef.current = [];
     setSelectedSeatIds(new Set());
-    const refreshed = await getSectionSeats(selectedSection.id);
+    const refreshed = await fetchLiveSectionSeats(selectedSection.id);
     setSeats(refreshed);
-  }, [selectedSection]);
+  }, [selectedSection, fetchLiveSectionSeats]);
 
   const handleBackToMap = useCallback(() => {
-    // Release locks in database immediately
-    fetch('/api/reservations/lock', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        eventId: event.id,
-        seatIds: [],
-        userSessionId: sessionId,
-      }),
-    }).catch((err) => console.error('Failed to release locks on back:', err));
+    // Only release locks if we have a real client-side session ID (not SSR placeholder).
+    if (sessionId && sessionId !== 'sess-ssr') {
+      fetch('/api/reservations/lock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId: event.id,
+          seatIds: [],
+          userSessionId: sessionId,
+        }),
+      }).catch((err) => console.error('Failed to release locks on back:', err));
+    }
 
     setView('map');
     setSelectedSection(null);
@@ -119,31 +141,97 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
     setSelectedSeatIds(new Set());
   }, [event.id, sessionId]);
 
-  // Synchronize seat states (polling) in real-time when seat picker is open
+  // Real-time Server-Sent Events (SSE) listener & fallback polling
   useEffect(() => {
     if (view !== 'seats' || !selectedSection) return;
 
     let active = true;
-    const intervalId = setInterval(async () => {
+
+    // 1. Establish SSE real-time stream connection
+    let eventSource: EventSource | null = null;
+    try {
+      eventSource = new EventSource(`/api/events/${event.id}/seat-stream`);
+      eventSource.onmessage = (evt) => {
+        try {
+          if (!evt.data || evt.data.startsWith(':')) return;
+          const update = JSON.parse(evt.data);
+          if (update.seatIds && Array.isArray(update.seatIds)) {
+            const affectedIds = new Set(update.seatIds);
+            setSeats((prev) =>
+              prev.map((s) => {
+                if (affectedIds.has(s.id)) {
+                  // Don't overwrite locally selected seats for current user
+                  if (selectedSeatIds.has(s.id) && update.userSessionId === sessionId) {
+                    return s;
+                  }
+                  return {
+                    ...s,
+                    status: update.status as SeatDTO['status'],
+                    heldBy: update.userSessionId,
+                  };
+                }
+                return s;
+              })
+            );
+          }
+        } catch (err) {
+          // Ignore non-json ping signals
+        }
+      };
+    } catch (err) {
+      console.error('Failed to connect SSE seat stream:', err);
+    }
+
+    // 2. Fallback polling (1.5 seconds)
+    // ponytail: fallback polling also uses server action to bypass Next.js GET caching.
+    // Upgrade path: could drop polling entirely if SSE is 100% reliable, or increase interval.
+    const refreshSeats = async () => {
       try {
-        const refreshed = await getSectionSeats(selectedSection.id);
-        if (active) {
-          setSeats(refreshed);
+        const freshSeats = await getSectionSeats(selectedSection.id);
+        if (active && freshSeats && freshSeats.length > 0) {
+          setSeats((prev) => {
+            if (!prev || prev.length === 0) return freshSeats;
+            const seatMap = new Map(freshSeats.map((s: any) => [s.id, s]));
+            return prev.map((oldSeat) => {
+              const updated: any = seatMap.get(oldSeat.id);
+              if (updated) {
+                return {
+                  ...oldSeat,
+                  ...updated,
+                  price: updated.price ?? oldSeat.price,
+                };
+              }
+              return oldSeat;
+            });
+          });
         }
       } catch (err) {
         console.error('Failed to poll seat updates:', err);
       }
-    }, 3000); // 3 seconds interval
+    };
+
+    const intervalId = setInterval(refreshSeats, 1500);
+
+    // 3. Immediate refresh on window focus / tab switch
+    const handleFocus = () => {
+      refreshSeats();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
 
     return () => {
       active = false;
       clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+      if (eventSource) eventSource.close();
     };
-  }, [view, selectedSection]);
+  }, [view, selectedSection, event.id, sessionId]);
 
   // Debounced database lock synchronization
   useEffect(() => {
-    if (view !== 'seats' || !selectedSection) return;
+    if (view !== 'seats' || !selectedSection || sessionId === 'sess-ssr') return;
 
     const currentIds = Array.from(selectedSeatIds).sort();
     const lastIds = [...lastLockedIdsRef.current].sort();
@@ -169,7 +257,7 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
         if (!response.ok || !data.success) {
           if (data.unavailableIds && Array.isArray(data.unavailableIds) && data.unavailableIds.length > 0) {
             const badIds = new Set<string>(data.unavailableIds);
-            
+
             // Clean up bad/stale seats from current selection
             setSelectedSeatIds((prev) => {
               const next = new Set(prev);
@@ -203,8 +291,8 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
     if (!selectedSection) return [];
     return generateSeatGrid({
       geometry: { ...selectedSection.geometry, clipToBoundary: false },
-      rowCount: (selectedSection as any).rowCount || 8,
-      seatsPerRow: (selectedSection as any).seatsPerRow || 12,
+      rowCount: (selectedSection as any).rowCount || 5,
+      seatsPerRow: (selectedSection as any).seatsPerRow || 5,
       seatRadius: 7,
       padding: 14,
       sectionId: selectedSection.id,
@@ -304,6 +392,7 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
                         seats={seats}
                         selectedIds={selectedSeatIds}
                         onToggleSeat={handleToggleSeat}
+                        disabledSeatKeys={selectedSection.geometry?.disabledSeats || []}
                         sessionId={sessionId}
                       />
                     )}

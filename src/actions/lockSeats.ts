@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { LockSeatsInput, LockSeatsResult } from '@/types/venue';
+import { broadcastSeatUpdate } from '@/lib/seatBroadcaster';
 
 export async function lockSeatsAction(input: LockSeatsInput): Promise<LockSeatsResult> {
   const { eventId, seatIds, userSessionId } = input;
@@ -9,6 +10,7 @@ export async function lockSeatsAction(input: LockSeatsInput): Promise<LockSeatsR
   // If seatIds is empty or undefined, release all locks for this session
   if (!seatIds || !seatIds.length) {
     try {
+      const releasedIds: string[] = [];
       await prisma.$transaction(async (tx) => {
         const existing = await tx.reservation.findMany({
           where: { userSessionId, eventId, status: 'PENDING' },
@@ -16,6 +18,7 @@ export async function lockSeatsAction(input: LockSeatsInput): Promise<LockSeatsR
         });
         for (const res of existing) {
           const resSeatIds = res.seats.map((rs) => rs.seatId);
+          releasedIds.push(...resSeatIds);
           await tx.reservation.update({
             where: { id: res.id },
             data: { status: 'EXPIRED' },
@@ -26,6 +29,14 @@ export async function lockSeatsAction(input: LockSeatsInput): Promise<LockSeatsR
           });
         }
       });
+      if (releasedIds.length > 0 && eventId) {
+        broadcastSeatUpdate({
+          eventId,
+          seatIds: releasedIds,
+          status: 'AVAILABLE',
+          userSessionId,
+        });
+      }
       return { success: true };
     } catch (err) {
       console.error('[lockSeatsAction] Clear locks error:', err);
@@ -94,7 +105,14 @@ export async function lockSeatsAction(input: LockSeatsInput): Promise<LockSeatsR
         data: { status: 'HELD' },
       });
 
-      return { reservationId: reservation.id, expiresAt };
+      return { reservationId: reservation.id, expiresAt, derivedEventId };
+    });
+
+    broadcastSeatUpdate({
+      eventId: result.derivedEventId,
+      seatIds,
+      status: 'HELD',
+      userSessionId,
     });
 
     return {

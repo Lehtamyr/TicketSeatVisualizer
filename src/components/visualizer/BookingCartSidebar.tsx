@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { SeatDTO, SectionDTO } from '@/types/venue';
 import { ShoppingCart, Clock, CheckCircle, Ticket, ChevronRight, XCircle } from 'lucide-react';
 
@@ -23,12 +24,16 @@ export function BookingCartSidebar({
   onBookingComplete,
   userSessionId,
 }: BookingCartSidebarProps) {
+  const router = useRouter();
   const [cartState, setCartState] = useState<CartState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState<number>(600); // 10 minutes
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const totalPrice = selectedSeats.reduce((sum, s) => sum + s.price, 0);
+  const totalPrice = selectedSeats.reduce(
+    (sum, s) => sum + (typeof s.price === 'number' && !isNaN(s.price) ? s.price : Number(s.price) || section?.price || 0),
+    0
+  );
 
   // Countdown timer starts immediately when there are selected seats
   useEffect(() => {
@@ -111,7 +116,8 @@ export function BookingCartSidebar({
         setTimeout(() => {
           onBookingComplete();
           setCartState('idle');
-        }, 10000);
+          router.push('/');
+        }, 1000);
       } else {
         setCartState('error');
         setError(confirmResult.error ?? 'Failed to confirm booking.');
@@ -170,7 +176,9 @@ export function BookingCartSidebar({
                 className="flex items-center gap-2 bg-white/[0.04] rounded-lg px-3 py-2">
                 <div className="flex-1">
                   <p className="text-sm text-white font-medium">Row {seat.row} · #{seat.number}</p>
-                  <p className="text-xs text-slate-400">${seat.price.toFixed(2)}</p>
+                  <p className="text-xs text-slate-400">
+                    ${(typeof seat.price === 'number' && !isNaN(seat.price) ? seat.price : Number(seat.price) || section?.price || 0).toFixed(2)}
+                  </p>
                 </div>
                 {cartState === 'idle' && (
                   <button
@@ -199,9 +207,8 @@ export function BookingCartSidebar({
       {selectedSeats.length > 0 && cartState !== 'confirmed' && (
         <div
           data-testid="countdown-timer"
-          className={`mx-5 mb-3 flex items-center gap-2 rounded-lg px-3 py-2 reservation-timer ${
-            isUrgent ? 'bg-red-500/15 border border-red-500/30' : 'bg-amber-500/10 border border-amber-500/20'
-          }`}
+          className={`mx-5 mb-3 flex items-center gap-2 rounded-lg px-3 py-2 reservation-timer ${isUrgent ? 'bg-red-500/15 border border-red-500/30' : 'bg-amber-500/10 border border-amber-500/20'
+            }`}
         >
           <Clock size={14} className={isUrgent ? 'text-red-400' : 'text-amber-400'} />
           <span className={`text-sm font-mono font-semibold ${isUrgent ? 'text-red-400' : 'text-amber-400'}`}>

@@ -66,9 +66,9 @@ export default function EventPage() {
             // Transform embedded seats to ensure SeatDTO.price is present
             const transformedSeats = s.seats
               ? s.seats.map((seat: any) => ({
-                  ...seat,
-                  price: seat.price ?? seat.priceOverride ?? sectionPrice,
-                }))
+                ...seat,
+                price: seat.price ?? seat.priceOverride ?? sectionPrice,
+              }))
               : undefined;
 
             return {

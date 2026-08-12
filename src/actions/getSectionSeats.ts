@@ -1,9 +1,11 @@
 'use server';
 
+import { unstable_noStore as noStore } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { SeatDTO } from '@/types/venue';
 
 export async function getSectionSeats(sectionId: string): Promise<SeatDTO[]> {
+  noStore(); // ponytail: force Next.js to never cache this Server Action
   // Find expired HELD reservations linked to seats in this section, release them
   const expiredReservations = await prisma.reservation.findMany({
     where: {

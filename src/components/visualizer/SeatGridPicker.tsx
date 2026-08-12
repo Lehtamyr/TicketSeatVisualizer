@@ -50,7 +50,7 @@ export function SeatGridPicker({
 
     const sourceSeats = (seats && seats.length > 0) ? seats : (
       generateSeatGrid({
-        geometry: { ...section.geometry, clipToBoundary: false },
+        geometry: { ...section.geometry, clipToBoundary: false, disabledSeats: adminMode ? [] : (disabledSeatKeys || []) },
         rowCount: (section as any).rowCount || 8,
         seatsPerRow: (section as any).seatsPerRow || 12,
         seatRadius: 7,
@@ -266,15 +266,12 @@ export function SeatGridPicker({
             const seatKey = `${seat.row}-${seat.number}`;
             const isDisabledInAdmin = disabledSeatKeys.includes(seatKey);
             const isSelected = selectedIds.has(seat.id);
-            const isHeldByOtherUser = seat.status === 'HELD' && (
-              !sessionId ||
-              ((seat as any).heldBy && (seat as any).heldBy !== sessionId) ||
-              ((seat as any).userId && (seat as any).userId !== sessionId)
-            );
-            const isHeld = !isSelected && isHeldByOtherUser;
+            // ponytail: If it's HELD and we didn't select it, it's held by someone else. 
+            // The DB doesn't return heldBy, so checking it was a bug.
+            const isHeld = seat.status === 'HELD' && !isSelected;
             const isReserved = (seat.status === 'RESERVED' || seat.status === 'BLOCKED') && !adminMode;
             const isAvailable = !isSelected && !isHeld && !isReserved && !isDisabledInAdmin;
-            const isBlocked = adminMode ? false : (isSelected ? false : (isReserved || isHeld));
+            const isBlocked = adminMode ? false : (isSelected ? false : (isReserved || isHeld || isDisabledInAdmin));
 
             let fillClass = '';
             if (isSelected) fillClass = 'seat-selected';
@@ -292,6 +289,8 @@ export function SeatGridPicker({
               : isHeld
               ? '#f59e0b'
               : 'rgba(255,255,255,0.2)';
+
+            if (isDisabledInAdmin && !adminMode) return null; // ponytail: completely hide admin-disabled seats from users
 
             const testIdAttr = `seat-button-${seat.id}`;
 
@@ -330,9 +329,9 @@ export function SeatGridPicker({
                       onToggleSeat(seat);
                     }
                   }}
-                  style={{ cursor: 'pointer', pointerEvents: 'auto' }}
+                  style={{ cursor: isBlocked ? 'not-allowed' : 'pointer', pointerEvents: 'auto' }}
                 >
-                  <title>{isDisabledInAdmin ? 'Disabled Seat (Click to restore)' : isReserved ? 'Sold' : isHeld ? 'Held' : `Row ${seat.row} · Seat ${seat.number} · $${seat.price}`}</title>
+                  <title>{isDisabledInAdmin ? (adminMode ? 'Disabled Seat (Click to restore)' : 'Disabled / Unavailable Seat') : isReserved ? 'Sold' : isHeld ? 'Held' : `Row ${seat.row} · Seat ${seat.number} · $${seat.price}`}</title>
                 </circle>
               </g>
             );

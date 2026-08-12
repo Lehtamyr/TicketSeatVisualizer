@@ -66,7 +66,7 @@ const DEFAULT_SECTION: AdminSection = {
   rowCount: 8,
   seatsPerRow: 12,
   seats: [], // Filled on initialize
-  showSeats: true,
+  showSeats: false, // ponytail: default off as requested
 };
 
 /* ─── Component ──────────────────────────────────────────────────────────── */
@@ -127,7 +127,7 @@ export function AdminCanvasWorkspace() {
                 rowCount: isStageShape ? 0 : s.rowCount,
                 seatsPerRow: isStageShape ? 0 : s.seatsPerRow,
                 seats: isStageShape ? [] : (s.seats || []),
-                showSeats: true,
+                showSeats: false, // ponytail: default off as requested
               };
             });
             setSections(mapped);
@@ -190,7 +190,7 @@ export function AdminCanvasWorkspace() {
     const scaleY = CANVAS_H / rect.height;
     const rawX = (e.clientX - rect.left) * scaleX;
     const rawY = (e.clientY - rect.top) * scaleY;
-    
+
     if (snapToGrid) {
       return {
         x: Math.round(rawX / 20) * 20,
@@ -205,7 +205,7 @@ export function AdminCanvasWorkspace() {
   }, [snapToGrid]);
 
   const generateSeats = useCallback((geometry: SectionGeometry, rowCount: number, seatsPerRow: number): GeneratedSeat[] => {
-    return generateSeatGrid({ geometry, rowCount, seatsPerRow, seatRadius: 7, padding: 14 });
+    return generateSeatGrid({ geometry: { ...geometry, disabledSeats: [] }, rowCount, seatsPerRow, seatRadius: 7, padding: 14 });
   }, []);
 
   const lastFinalizedTimeRef = useRef<number>(0);
@@ -228,8 +228,8 @@ export function AdminCanvasWorkspace() {
     if (bbox.width < 20 || bbox.height < 20 || area < 100) return;
 
     const geometry: SectionGeometry = { shapeType, points: uniquePoints, clipToBoundary: true };
-    const rowCount = 8;
-    const seatsPerRow = 12;
+    const rowCount = 5;
+    const seatsPerRow = 5;
     const id = `section-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     setSections((prev) => {
@@ -246,7 +246,7 @@ export function AdminCanvasWorkspace() {
         rowCount: isStage ? 0 : rowCount,
         seatsPerRow: isStage ? 0 : seatsPerRow,
         seats: isStage ? [] : generateSeats(geometry, rowCount, seatsPerRow),
-        showSeats: !isStage,
+        showSeats: false, // ponytail: default off as requested
       };
       return [...prev, newSection];
     });
@@ -451,7 +451,7 @@ export function AdminCanvasWorkspace() {
   const handleToggleSeat = useCallback((sectionId: string, row: string, number: number) => {
     setSections((prev) => prev.map((s) => {
       if (s.id !== sectionId) return s;
-      
+
       const seatKey = `${row}-${number}`;
       const currentDisabled = s.geometry.disabledSeats || [];
       const updatedDisabled = currentDisabled.includes(seatKey)
@@ -610,11 +610,10 @@ export function AdminCanvasWorkspace() {
                 key={key}
                 data-testid={`tool-${key}`}
                 onClick={() => { setTool(key); setDrawing(false); setPolyPoints([]); setRectStart(null); }}
-                className={`flex flex-col items-center gap-1 py-2 px-1 rounded-lg text-xs font-medium transition-all ${
-                  tool === key
+                className={`flex flex-col items-center gap-1 py-2 px-1 rounded-lg text-xs font-medium transition-all ${tool === key
                     ? 'bg-indigo-600 text-white'
                     : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'
-                }`}
+                  }`}
               >
                 <Icon size={14} />
                 {label}
@@ -630,9 +629,8 @@ export function AdminCanvasWorkspace() {
             <div
               key={s.id}
               onClick={() => setSelectedId(s.id)}
-              className={`flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer mb-1 transition-all ${
-                selectedId === s.id ? 'bg-indigo-600/20 border border-indigo-500/30' : 'hover:bg-white/[0.04]'
-              }`}
+              className={`flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer mb-1 transition-all ${selectedId === s.id ? 'bg-indigo-600/20 border border-indigo-500/30' : 'hover:bg-white/[0.04]'
+                }`}
             >
               <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: s.color }} />
               <span className="text-xs text-slate-200 flex-1 truncate">{s.name}</span>
@@ -661,11 +659,10 @@ export function AdminCanvasWorkspace() {
             type="button"
             data-testid="toggle-snap-grid"
             onClick={() => setSnapToGrid((prev) => !prev)}
-            className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border font-medium transition-all ${
-              snapToGrid
+            className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border font-medium transition-all ${snapToGrid
                 ? 'bg-indigo-600/30 border-indigo-500/50 text-indigo-200 shadow-sm'
                 : 'bg-white/[0.04] border-white/[0.08] text-slate-400 hover:text-white'
-            }`}
+              }`}
             title="Toggle 20px Grid Snapping"
           >
             <Grid3X3 size={13} />
