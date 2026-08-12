@@ -123,11 +123,15 @@ export function generateSeatGrid(options: SeatGeneratorOptions): GeneratedSeat[]
   const startY = minY + pad;
   const endY = maxY - pad;
 
+  const isRectOrSquare = options.geometry?.shapeType === 'RECTANGLE' || options.geometry?.shapeType === 'SQUARE' || !options.geometry?.shapeType;
+
   const minRowStep = seatRadius * 2 + 8;
   const minStep = seatRadius * 2 + 6;
 
   const rawRowStep = rowCount > 1 ? (endY - startY) / (rowCount - 1) : 0;
-  const rowStep = rawRowStep;
+  const rowStep = isRectOrSquare ? Math.max(minRowStep, rawRowStep) : rawRowStep;
+  const totalRowHeight = (rowCount - 1) * rowStep;
+  const centerY = minY + height / 2;
 
   const seats: GeneratedSeat[] = [];
 
@@ -136,7 +140,10 @@ export function generateSeatGrid(options: SeatGeneratorOptions): GeneratedSeat[]
   const disabledSeats = options.geometry?.disabledSeats || [];
 
   for (let r = 0; r < rowCount; r++) {
-    const candidateY = rowCount === 1 ? minY + height / 2 : startY + r * rowStep;
+    // Center rows vertically to ensure neat alignment even when shape is smaller than rowStep (only for rectangles/squares)
+    const candidateY = isRectOrSquare
+      ? (rowCount === 1 ? centerY : centerY - totalRowHeight / 2 + r * rowStep)
+      : (rowCount === 1 ? minY + height / 2 : startY + r * rowStep);
     const rowLabel = getRowLabel(r);
     const rowConfig = rowConfigs.find((rc) => rc.row === rowLabel);
     const seatsInRow = rowConfig ? rowConfig.seatCount : seatsPerRow;
@@ -144,7 +151,8 @@ export function generateSeatGrid(options: SeatGeneratorOptions): GeneratedSeat[]
     let rowStartX = startX;
     let rowEndX = endX;
 
-    if (clipToBoundary) {
+    // Use boundary shape clipping only when shape dimensions can support the raw row position
+    if (clipToBoundary && rowStep === rawRowStep) {
       const span = getPolygonHorizontalSpanAtY(candidateY, polygon, pad);
       if (span) {
         rowStartX = span.xMin;
@@ -153,21 +161,30 @@ export function generateSeatGrid(options: SeatGeneratorOptions): GeneratedSeat[]
     }
 
     const rawStep = seatsInRow > 1 ? (rowEndX - rowStartX) / (seatsInRow - 1) : 0;
-    const step = rawStep;
+    const step = isRectOrSquare ? Math.max(minStep, rawStep) : rawStep;
+    const totalRowWidth = (seatsInRow - 1) * step;
+    const rowCenterX = (rowStartX + rowEndX) / 2;
 
     for (let c = 0; c < seatsInRow; c++) {
-      const candidateX = seatsInRow === 1 ? (rowStartX + rowEndX) / 2 : rowStartX + c * step;
+      // Center seats horizontally within each row (only for rectangles/squares)
+      const candidateX = isRectOrSquare
+        ? (seatsInRow === 1 ? rowCenterX : rowCenterX - totalRowWidth / 2 + c * step)
+        : (seatsInRow === 1 ? (rowStartX + rowEndX) / 2 : rowStartX + c * step);
       const center: Point = { x: candidateX, y: candidateY };
 
       const seatNum = c + 1;
       const seatId = `${rowLabel}-${seatNum}`;
 
-      // Skip if manually disabled or outside boundary when clipping is enabled
+      // Skip if manually disabled
       if (disabledSeats.includes(seatId)) {
         continue;
       }
 
-      if (clipToBoundary && polygon.length >= 3 && !isPointInPolygon(center, polygon, false)) {
+      // Bypass clipping check only for RECTANGLE and SQUARE shapes if spacing was expanded to prevent overlaps
+      const isExpanded = rowStep > rawRowStep || step > rawStep;
+      const skipClip = isRectOrSquare && isExpanded;
+
+      if (!skipClip && clipToBoundary && polygon.length >= 3 && !isPointInPolygon(center, polygon, false)) {
         continue;
       }
 
@@ -190,15 +207,29 @@ export function generateSeatGrid(options: SeatGeneratorOptions): GeneratedSeat[]
   // Fallback: If no seats fit (e.g. narrow section or small polygon), place seats inside bounding box
   if (seats.length === 0 && rowCount > 0 && seatsPerRow > 0 && width > 0 && height > 0) {
     let fallbackRowIdx = 0;
-    const fbRowStep = rowCount > 1 ? height / (rowCount + 1) : 0;
-    const fbSeatStep = seatsPerRow > 1 ? width / (seatsPerRow + 1) : 0;
+    const fbRowStep = isRectOrSquare
+      ? Math.max(minRowStep, rowCount > 1 ? height / (rowCount + 1) : 0)
+      : (rowCount > 1 ? height / (rowCount + 1) : 0);
+    const fbSeatStep = isRectOrSquare
+      ? Math.max(minStep, seatsPerRow > 1 ? width / (seatsPerRow + 1) : 0)
+      : (seatsPerRow > 1 ? width / (seatsPerRow + 1) : 0);
+
+    const fbTotalHeight = (rowCount - 1) * fbRowStep;
+    const fbTotalWidth = (seatsPerRow - 1) * fbSeatStep;
+
+    const fbCenterY = minY + height / 2;
+    const fbCenterX = minX + width / 2;
 
     for (let r = 0; r < rowCount; r++) {
-      const py = rowCount === 1 ? minY + height / 2 : minY + (r + 1) * fbRowStep;
+      const py = !isRectOrSquare
+        ? (rowCount === 1 ? minY + height / 2 : minY + (r + 1) * fbRowStep)
+        : (rowCount === 1 ? fbCenterY : fbCenterY - fbTotalHeight / 2 + r * fbRowStep);
       const rowLabel = getRowLabel(fallbackRowIdx++);
 
       for (let c = 0; c < seatsPerRow; c++) {
-        const px = seatsPerRow === 1 ? minX + width / 2 : minX + (c + 1) * fbSeatStep;
+        const px = !isRectOrSquare
+          ? (seatsPerRow === 1 ? minX + width / 2 : minX + (c + 1) * fbSeatStep)
+          : (seatsPerRow === 1 ? fbCenterX : fbCenterX - fbTotalWidth / 2 + c * fbSeatStep);
         const seatNum = c + 1;
         const seat: GeneratedSeat = {
           row: rowLabel,

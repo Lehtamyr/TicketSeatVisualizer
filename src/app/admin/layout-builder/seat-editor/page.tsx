@@ -299,160 +299,90 @@ function SeatEditorWorkspace() {
           className="flex-1 relative flex items-center justify-center p-8 transition-colors duration-500 overflow-hidden select-none"
           style={{ background: selectedSectionId ? 'radial-gradient(ellipse at center, #0c1322 0%, #070a12 100%)' : '#0a0d16' }}
         >
-          {/* Legend indicator */}
-          <div className="absolute top-4 left-4 glass px-3 py-2 border border-white/[0.06] rounded-xl text-[10px] text-slate-400 flex flex-col gap-1.5 shadow-lg z-20">
-            <span className="font-semibold text-slate-200">Simulation View:</span>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded bg-indigo-500" />
-              <span>Active Seat (Click to disable)</span>
+          {selectedSection ? (
+            <div className="w-full h-full flex flex-col items-center justify-center overflow-hidden">
+              <div className="w-full max-w-4xl h-[72vh] flex flex-col bg-[#090d16]/30 border border-white/[0.06] rounded-2xl p-4 shadow-2xl relative select-none">
+                <SeatGridPicker
+                  section={selectedSection as any}
+                  seats={selectedSection.seats as any}
+                  selectedIds={new Set()}
+                  onToggleSeat={() => {}}
+                  adminMode={true}
+                  disabledSeatKeys={selectedSection.geometry.disabledSeats || []}
+                  onToggleDisabledSeat={(sectionId, row, number) => handleToggleSeat(sectionId, row, number)}
+                  onDeleteRow={(rowLabel) => handleToggleRow(selectedSection.id, rowLabel)}
+                />
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full border border-dashed border-indigo-500 bg-indigo-500/15" />
-              <span>Disabled/Gap Seat (Click to restore)</span>
-            </div>
-            <div className="flex items-center gap-1.5 mt-1 border-t border-white/[0.04] pt-1">
-              <span>{selectedSectionId ? '🔍 Zoomed Section Mode' : '🗺️ Full Map Mode (Click section shape)'}</span>
-            </div>
-          </div>
+          ) : (
+            <>
+              {/* Legend indicator */}
+              <div className="absolute top-4 left-4 glass px-3 py-2 border border-white/[0.06] rounded-xl text-[10px] text-slate-400 flex flex-col gap-1.5 shadow-lg z-20">
+                <span className="font-semibold text-slate-200">Simulation View:</span>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded bg-indigo-500" />
+                  <span>Active Seat (Click to disable)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full border border-dashed border-indigo-500 bg-indigo-500/15" />
+                  <span>Disabled/Gap Seat (Click to restore)</span>
+                </div>
+                <div className="flex items-center gap-1.5 mt-1 border-t border-white/[0.04] pt-1">
+                  <span>{selectedSectionId ? '🔍 Zoomed Section Mode' : '🗺️ Full Map Mode (Click section shape)'}</span>
+                </div>
+              </div>
 
-          <svg
-            viewBox={viewBoxStr}
-            preserveAspectRatio="xMidYMid meet"
-            className="w-full h-full max-w-full max-h-full object-contain transition-all duration-500 ease-out"
-          >
-            {/* Render sections */}
-            {sections.map((s) => {
-              const path = renderShapePath(s.geometry);
-              const centroid = calculateCentroid(s.geometry.points ?? []);
-              const isSelected = selectedSectionId === s.id;
+              <svg
+                viewBox={viewBoxStr}
+                preserveAspectRatio="xMidYMid meet"
+                className="w-full h-full max-w-full max-h-full object-contain transition-all duration-500 ease-out"
+              >
+                {/* Render sections */}
+                {sections.map((s) => {
+                  const path = renderShapePath(s.geometry);
+                  const centroid = calculateCentroid(s.geometry.points ?? []);
+                  const isSelected = selectedSectionId === s.id;
 
-              return (
-                <g
-                  key={s.id}
-                  onClick={() => {
-                    if (!selectedSectionId) {
-                      setSelectedSectionId(s.id);
-                    }
-                  }}
-                  className="transition-all"
-                >
-                  {/* Seating Grid (drawn behind) */}
-                  {s.showSeats && s.shapeType !== 'STAGE' && (() => {
-                    const potentialSeats = generateSeatGrid({
-                      geometry: { ...s.geometry, disabledSeats: [] },
-                      rowCount: s.rowCount,
-                      seatsPerRow: s.seatsPerRow,
-                      seatRadius: 7,
-                      padding: 14
-                    });
-                    const disabledList = s.geometry.disabledSeats || [];
+                  return (
+                    <g
+                      key={s.id}
+                      onClick={() => {
+                        if (!selectedSectionId) {
+                          setSelectedSectionId(s.id);
+                        }
+                      }}
+                      className="transition-all"
+                    >
+                      {/* Section Label (rendered if not zoomed into another section) */}
+                      {(!selectedSectionId || isSelected) && (
+                        <g style={{ pointerEvents: 'none' }}>
+                          <text x={centroid.x} y={centroid.y - 8} textAnchor="middle"
+                            fill="#fff" fontSize="11" fontWeight="700" fontFamily="Inter, sans-serif">{s.code}</text>
+                          <text x={centroid.x} y={centroid.y + 8} textAnchor="middle"
+                            fill="rgba(255,255,255,0.5)" fontSize="9" fontFamily="Inter, sans-serif">{s.name}</text>
+                        </g>
+                      )}
 
-                    // Group seats by row for user-style row labels and row deletion controls
-                    const rowGroups: Record<string, typeof potentialSeats> = {};
-                    for (const st of potentialSeats) {
-                      if (!rowGroups[st.row]) rowGroups[st.row] = [];
-                      rowGroups[st.row].push(st);
-                    }
-
-                    const totalSeats = s.rowCount * s.seatsPerRow;
-                    const seatR = selectedSectionId ? (totalSeats > 90 ? 4.2 : totalSeats > 40 ? 5.2 : 6.5) : (totalSeats > 90 ? 2.5 : totalSeats > 40 ? 3.0 : 3.5);
-                    const seatStrokeW = totalSeats > 90 ? 0.7 : totalSeats > 40 ? 0.9 : 1.2;
-
-                    return (
-                      <g key="seating-group">
-                        {/* Canvas Row Labels & Row Delete Action Buttons */}
-                        {isSelected && Object.entries(rowGroups).map(([rowLabel, rowSeats]) => {
-                          const minX = Math.min(...rowSeats.map((st) => st.x));
-                          const rowY = rowSeats[0].y;
-                          const isRowDisabled = rowSeats.every((st) => disabledList.includes(`${st.row}-${st.number}`));
-
-                          return (
-                            <g key={`row-header-${rowLabel}`} style={{ cursor: 'pointer' }} onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleRow(s.id, rowLabel);
-                            }}>
-                              <text
-                                x={minX - 18}
-                                y={rowY + 3.5}
-                                textAnchor="end"
-                                fill={isRowDisabled ? "rgba(239,68,68,0.6)" : "rgba(255,255,255,0.4)"}
-                                fontSize="7.5"
-                                fontWeight="600"
-                                fontFamily="JetBrains Mono, monospace"
-                              >
-                                {rowLabel} {isRowDisabled ? '✕' : '🗑'}
-                              </text>
-                            </g>
-                          );
-                        })}
-
-                        {/* Seats with Inset Boundary Hitbox Stroke */}
-                        {potentialSeats.map((seat, si) => {
-                          const isDisabled = disabledList.includes(`${seat.row}-${seat.number}`);
-                          const strokeColor = isDisabled ? "rgba(239,68,68,0.6)" : "rgba(255,255,255,0.45)";
-
-                          return (
-                            <circle
-                              key={si}
-                              cx={seat.x}
-                              cy={seat.y}
-                              r={seatR}
-                              fill={isDisabled ? "rgba(239, 68, 68, 0.25)" : s.color}
-                              stroke={strokeColor}
-                              strokeWidth={seatStrokeW}
-                              strokeDasharray={isDisabled ? "2.5 1.5" : undefined}
-                              fillOpacity={isDisabled ? 0.25 : 0.85}
-                              className="hover:scale-125 transition-transform"
-                              style={{
-                                cursor: selectedSectionId ? 'pointer' : 'default',
-                                transition: 'all 0.15s ease',
-                                pointerEvents: selectedSectionId ? 'auto' : 'none',
-                                transformOrigin: 'center',
-                                transformBox: 'fill-box',
-                              }}
-                              onClick={(e) => {
-                                if (selectedSectionId) {
-                                  e.stopPropagation();
-                                  handleToggleSeat(s.id, seat.row, seat.number);
-                                }
-                              }}
-                            >
-                              <title>{`Row ${seat.row} · Seat ${seat.number} (${isDisabled ? 'Disabled/Deleted - Click to restore' : 'Active - Click to disable'})`}</title>
-                            </circle>
-                          );
-                        })}
-                      </g>
-                    );
-                  })()}
-
-                  {/* Section Label (rendered if not zoomed into another section) */}
-                  {(!selectedSectionId || isSelected) && (
-                    <g style={{ pointerEvents: 'none' }}>
-                      <text x={centroid.x} y={centroid.y - 8} textAnchor="middle"
-                        fill="#fff" fontSize="11" fontWeight="700" fontFamily="Inter, sans-serif">{s.code}</text>
-                      <text x={centroid.x} y={centroid.y + 8} textAnchor="middle"
-                        fill="rgba(255,255,255,0.5)" fontSize="9" fontFamily="Inter, sans-serif">{s.name}</text>
+                      {/* Bounding shape contour with dynamic border stroke scaling */}
+                      <path
+                        d={path}
+                        fill={s.shapeType === 'STAGE' ? '#312e81' : s.color}
+                        fillOpacity={s.shapeType === 'STAGE' ? 0.85 : (selectedSectionId ? (isSelected ? 0.08 : 0.02) : 0.18)}
+                        stroke={s.shapeType === 'STAGE' ? '#818cf8' : s.color}
+                        strokeWidth={isSelected ? (s.rowCount * s.seatsPerRow > 90 ? 1.0 : s.rowCount * s.seatsPerRow > 40 ? 1.4 : 2.0) : 1.5}
+                        strokeDasharray={selectedSectionId && !isSelected ? "3 3" : undefined}
+                        style={{
+                          cursor: selectedSectionId ? 'default' : 'pointer',
+                          transition: 'all 0.3s ease',
+                          pointerEvents: selectedSectionId ? 'none' : 'auto',
+                        }}
+                      />
                     </g>
-                  )}
-
-                  {/* Bounding shape contour with dynamic border stroke scaling */}
-                  <path
-                    d={path}
-                    fill={s.shapeType === 'STAGE' ? '#312e81' : s.color}
-                    fillOpacity={s.shapeType === 'STAGE' ? 0.85 : (selectedSectionId ? (isSelected ? 0.08 : 0.02) : 0.18)}
-                    stroke={s.shapeType === 'STAGE' ? '#818cf8' : s.color}
-                    strokeWidth={isSelected ? (s.rowCount * s.seatsPerRow > 90 ? 1.0 : s.rowCount * s.seatsPerRow > 40 ? 1.4 : 2.0) : 1.5}
-                    strokeDasharray={selectedSectionId && !isSelected ? "3 3" : undefined}
-                    style={{
-                      cursor: selectedSectionId ? 'default' : 'pointer',
-                      transition: 'all 0.3s ease',
-                      pointerEvents: selectedSectionId ? 'none' : 'auto',
-                    }}
-                  />
-                </g>
-              );
-            })}
-          </svg>
+                  );
+                })}
+              </svg>
+            </>
+          )}
         </div>
 
         {/* Right properties panel */}

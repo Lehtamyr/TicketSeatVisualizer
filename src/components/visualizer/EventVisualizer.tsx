@@ -292,7 +292,7 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
 
                 {/* Modal Body: Seat Grid on Left, Booking Sidebar on Right */}
                 <div className="flex flex-1 overflow-hidden">
-                  <div className="flex-1 overflow-auto p-6 flex items-center justify-center">
+                  <div className="flex-1 flex flex-col items-center justify-center overflow-hidden p-6">
                     {loadingSeats ? (
                       <div className="flex items-center gap-3 text-slate-400">
                         <Loader2 size={24} className="animate-spin" />

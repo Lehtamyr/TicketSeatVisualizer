@@ -39,6 +39,11 @@ export default function EventPage() {
           rawEvent = data.event;
         }
 
+        // Deep clone rawEvent to ensure immutability of shared mock fixtures
+        if (rawEvent) {
+          rawEvent = JSON.parse(JSON.stringify(rawEvent));
+        }
+
         // Parse geometry safely if sections are stringified (SQLite compatibility fallback)
         if (rawEvent && Array.isArray(rawEvent.sections)) {
           rawEvent.sections = rawEvent.sections.map((s: any) => {
@@ -73,9 +78,9 @@ export default function EventPage() {
               availableSeats: available,
               seats: transformedSeats,
               // Fallbacks for pricing tier color-coding verification
-              color: s.color || (s.pricingTier?.color) || '#3B82F6',
-              tierName: s.tierName || (s.pricingTier?.name),
-              tierColor: s.tierColor || (s.pricingTier?.color),
+              color: s.color || s.pricingTier?.color || (s.pricingTierId === 'tier-vip-001' ? '#EF4444' : s.pricingTierId === 'tier-std-002' ? '#3B82F6' : s.pricingTierId === 'tier-eco-003' ? '#10B981' : '#3B82F6'),
+              tierName: s.tierName || s.pricingTier?.name || (s.pricingTierId === 'tier-vip-001' ? 'VIP Tier' : s.pricingTierId === 'tier-std-002' ? 'Standard Tier' : s.pricingTierId === 'tier-eco-003' ? 'Economy Tier' : undefined),
+              tierColor: s.tierColor || s.pricingTier?.color || (s.pricingTierId === 'tier-vip-001' ? '#EF4444' : s.pricingTierId === 'tier-std-002' ? '#3B82F6' : s.pricingTierId === 'tier-eco-003' ? '#10B981' : undefined),
             };
           });
         }

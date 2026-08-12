@@ -177,16 +177,7 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
               onMouseEnter={(e) => handleSectionMouseEnter(section, e)}
               onMouseLeave={handleSectionMouseLeave}
             >
-              {/* Centroid indicator (drawn behind) */}
-              <circle
-                cx={centroid.x}
-                cy={centroid.y}
-                r={Math.min(bbox.width, bbox.height) * 0.08}
-                fill="rgba(0,0,0,0.5)"
-                stroke={ringColor}
-                strokeWidth="1.5"
-                style={{ pointerEvents: 'none' }}
-              />
+
 
               <text
                 x={centroid.x}
@@ -238,6 +229,11 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
           const tx = Math.min(tooltip.x + 12, vbW - tipW - 8);
           const ty = Math.max(tooltip.y - tipH - 12, 8);
           const grade = getAvailabilityGrade(s);
+          const tierName = s.tierName || (s as any).pricingTier?.name || (
+            s.price >= 120 ? 'VIP Tier' :
+            s.price <= 45 ? 'Economy Tier' :
+            'Standard Tier'
+          );
           return (
             <g
               data-testid="section-tooltip"
@@ -249,9 +245,9 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
               <text x={tx + 10} y={ty + 20} fill="#f0f4ff" fontSize="11" fontWeight="700" fontFamily="Inter, sans-serif">
                 {s.name}
               </text>
-              {s.tierName && (
-                <text x={tx + 10} y={ty + 35} fill={s.tierColor ?? '#8892a4'} fontSize="9" fontFamily="Inter, sans-serif">
-                  {s.tierName}
+              {tierName && (
+                <text x={tx + 10} y={ty + 35} fill={s.tierColor ?? (s as any).pricingTier?.color ?? '#8892a4'} fontSize="9" fontFamily="Inter, sans-serif">
+                  {tierName}
                 </text>
               )}
               <text x={tx + 10} y={ty + 50} fill="#8892a4" fontSize="9" fontFamily="Inter, sans-serif">

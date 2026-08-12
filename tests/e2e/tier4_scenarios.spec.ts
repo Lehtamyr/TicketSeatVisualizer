@@ -54,7 +54,7 @@ test.describe('Tier 4 Real-World Application Scenario Tests', () => {
     });
 
     // Mock API Route Handlers
-    await page.route('/api/layouts*', async (route) => {
+    await page.route('**/api/layouts*', async (route) => {
       const method = route.request().method();
       if (method === 'GET') {
         const layouts = await mockPrisma.venueLayout.findMany();
@@ -83,7 +83,7 @@ test.describe('Tier 4 Real-World Application Scenario Tests', () => {
       return route.continue();
     });
 
-    await page.route('/api/events*', async (route) => {
+    await page.route('**/api/events*', async (route) => {
       const events = await mockPrisma.event.findMany();
       return route.fulfill({
         status: 200,
@@ -92,7 +92,7 @@ test.describe('Tier 4 Real-World Application Scenario Tests', () => {
       });
     });
 
-    await page.route('/api/reservations/lock*', async (route) => {
+    await page.route('**/api/reservations/lock*', async (route) => {
       const body = route.request().postDataJSON();
       const { userSessionId, seatIds } = body || {};
 
@@ -147,7 +147,7 @@ test.describe('Tier 4 Real-World Application Scenario Tests', () => {
       });
     });
 
-    await page.route('/api/reservations/confirm*', async (route) => {
+    await page.route('**/api/reservations/confirm*', async (route) => {
       const body = route.request().postDataJSON();
       const { reservationId, seatIds } = body || {};
 
@@ -173,7 +173,7 @@ test.describe('Tier 4 Real-World Application Scenario Tests', () => {
       });
     });
 
-    await page.route('/api/cron/cleanup*', async (route) => {
+    await page.route('**/api/cron/cleanup*', async (route) => {
       const reservations = await mockPrisma.reservation.findMany();
       const now = new Date();
       let expiredCount = 0;
