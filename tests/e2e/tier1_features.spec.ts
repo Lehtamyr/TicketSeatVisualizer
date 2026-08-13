@@ -150,6 +150,32 @@ test.describe('R2. Interactive Seat Picker & Booking Flow E2E Tests', () => {
         }),
       });
     });
+
+    // Intercept Next.js Server Actions and abort them to force the component to fall back to the mockSeatsRectangle above.
+    await page.route('**/*', async (route, request) => {
+      if (request.method() === 'POST' && await request.headerValue('Next-Action')) {
+        await route.abort('failed');
+      } else {
+        await route.fallback();
+      }
+    });
+
+    // Mock the locking and confirming API routes so tests don't clash over the real database
+    await page.route(/\/api\/reservations\/lock/, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: { reservationId: 'res-mock-123', expiresAt: new Date(Date.now() + 10 * 60000).toISOString() } }),
+      });
+    });
+
+    await page.route(/\/api\/reservations\/confirm/, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: { reservationId: 'res-mock-123' } }),
+      });
+    });
   });
 
   // TEST 1: Granular Seat Grid Overlay Rendering
@@ -323,6 +349,9 @@ test.describe('R3. Interactive Admin Layout Builder E2E Tests', () => {
 
     // Click Apply Generator
     await page.locator('[data-testid="btn-apply-grid-generator"], button:has-text("Generate")').click();
+
+    // Show seats preview (we set default to off in a previous change)
+    await page.locator('button:has(.lucide-eye)').first().click({ force: true });
 
     // Verify 24 seats generated inside shape preview
     const previewSeats = page.locator('[data-testid^="grid-preview-seat-"]');

@@ -92,59 +92,76 @@ test.describe('Tier 4 Real-World Application Scenario Tests', () => {
       });
     });
 
+    let lockPromise = Promise.resolve();
     await page.route('**/api/reservations/lock*', async (route) => {
-      const body = route.request().postDataJSON();
-      const { userSessionId, seatIds } = body || {};
+      const method = route.request().method();
+      if (method === 'POST') {
+        const body = route.request().postDataJSON();
+        const { seatIds, userSessionId } = body || {};
 
-      // Check for double booking conflict
-      const allSeats = await mockPrisma.seat.findMany();
-      const contendedSeats = allSeats.filter(
-        (s) => seatIds?.includes(s.id) && (s.status === 'HELD' || s.status === 'RESERVED')
-      );
+        // True Promise-based Mutex to prevent race conditions in mock implementation
+        let release: () => void;
+        const nextLock = new Promise<void>(resolve => { release = resolve; });
+        const currentLock = lockPromise;
+        lockPromise = currentLock.then(() => nextLock);
+        await currentLock;
 
-      if (contendedSeats.length > 0) {
-        return route.fulfill({
-          status: 409,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            success: false,
-            error: `Seat ${contendedSeats[0].id} is already locked or reserved by another user.`,
-          }),
-        });
+        try {
+          // Check for double booking conflict
+          const allSeats = await mockPrisma.seat.findMany();
+          const contendedSeats = allSeats.filter(
+            (s) => seatIds?.includes(s.id) && (s.status === 'HELD' || s.status === 'RESERVED')
+          );
+
+          if (contendedSeats.length > 0) {
+            return await route.fulfill({
+              status: 409,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                success: false,
+                error: `Seat ${contendedSeats[0].id} is already locked or reserved by another user.`,
+              }),
+            });
+          }
+
+          // Acquire locks
+          for (const id of seatIds || []) {
+            await mockPrisma.seat.update({
+              where: { id },
+              data: { status: 'HELD' },
+            });
+          }
+
+          const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+          const reservation = await mockPrisma.reservation.create({
+            data: {
+              eventId: mockEventConcert.id,
+              userSessionId: userSessionId || 'sess-scenario-user',
+              status: 'PENDING',
+              totalAmount: (seatIds?.length || 1) * 75.0,
+              expiresAt,
+            },
+          });
+
+          return await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              success: true,
+              data: {
+                reservationId: reservation.id,
+                expiresAt: expiresAt.toISOString(),
+                status: 'PENDING',
+                seatIds,
+              },
+            }),
+          });
+        } finally {
+          release!();
+        }
+      } else {
+        return route.continue();
       }
-
-      // Acquire locks
-      for (const id of seatIds || []) {
-        await mockPrisma.seat.update({
-          where: { id },
-          data: { status: 'HELD' },
-        });
-      }
-
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-      const reservation = await mockPrisma.reservation.create({
-        data: {
-          eventId: mockEventConcert.id,
-          userSessionId: userSessionId || 'sess-scenario-user',
-          status: 'PENDING',
-          totalAmount: (seatIds?.length || 1) * 75.0,
-          expiresAt,
-        },
-      });
-
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          data: {
-            reservationId: reservation.id,
-            expiresAt: expiresAt.toISOString(),
-            status: 'PENDING',
-            seatIds,
-          },
-        }),
-      });
     });
 
     await page.route('**/api/reservations/confirm*', async (route) => {
@@ -337,16 +354,24 @@ test.describe('Tier 4 Real-World Application Scenario Tests', () => {
    * Scenario 2: High-Demand Event Ticket Sale Rush (Simulated multi-session user booking flow across multiple sections with concurrent locking).
    */
   test('Scenario 2: High-Demand Event Ticket Sale Rush with Concurrent Locking', async ({ page }) => {
+    // Navigate to a valid page so relative fetch() in page.evaluate works
+    await page.goto(`/events/${mockEventConcert.id}`);
+
     const contendedSeatId = 'seat-rect-5';
     const userA = 'sess-rush-user-A';
     const userB = 'sess-rush-user-B';
 
     // Simulate concurrent lock function using helper
     const lockFn = async (userSessionId: string, seatIds: string[]) => {
-      const response = await page.request.post('/api/reservations/lock', {
-        data: { userSessionId, seatIds },
-      });
-      const data = await response.json();
+      const data = await page.evaluate(async (args) => {
+        const res = await fetch('/api/reservations/lock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(args)
+        });
+        return res.json();
+      }, { userSessionId, seatIds });
+
       if (!data.success) {
         throw new Error(data.error);
       }
@@ -372,12 +397,17 @@ test.describe('Tier 4 Real-World Application Scenario Tests', () => {
     expect(errorReason.message).toContain('already locked or reserved');
 
     // The losing user falls back to select alternative available seat
-    const fallbackResponse = await page.request.post('/api/reservations/lock', {
-      data: { userSessionId: userB, seatIds: ['seat-rect-7', 'seat-rect-8'] },
-    });
-    expect(fallbackResponse.status()).toBe(200);
-    const fallbackResult = await fallbackResponse.json();
-    expect(fallbackResult.success).toBe(true);
+    const fallbackResult = await page.evaluate(async (args) => {
+      const res = await fetch('/api/reservations/lock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(args)
+      });
+      return { status: res.status, json: await res.json() };
+    }, { userSessionId: userB, seatIds: ['seat-rect-7', 'seat-rect-8'] });
+
+    expect(fallbackResult.status).toBe(200);
+    expect(fallbackResult.json.success).toBe(true);
   });
 
   /**

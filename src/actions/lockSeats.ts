@@ -63,6 +63,12 @@ export async function lockSeatsAction(input: LockSeatsInput): Promise<LockSeatsR
         });
       }
 
+      // 1.5 Force a write lock on the target seats (sqlite work-around for SELECT FOR UPDATE)
+      await tx.seat.updateMany({
+        where: { id: { in: seatIds } },
+        data: { updatedAt: new Date() },
+      });
+
       // 2. Check and lock new seats
       const seats = await tx.seat.findMany({
         where: { id: { in: seatIds } },
@@ -100,10 +106,13 @@ export async function lockSeatsAction(input: LockSeatsInput): Promise<LockSeatsR
         },
       });
 
-      await tx.seat.updateMany({
-        where: { id: { in: seatIds } },
+      const updated = await tx.seat.updateMany({
+        where: { id: { in: seatIds }, status: 'AVAILABLE' },
         data: { status: 'HELD' },
       });
+      if (updated.count !== seatIds.length) {
+        throw new Error('One or more seats are already locked or reserved.');
+      }
 
       return { reservationId: reservation.id, expiresAt, derivedEventId };
     });

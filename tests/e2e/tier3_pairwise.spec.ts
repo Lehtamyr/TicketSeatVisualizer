@@ -243,15 +243,20 @@ test.describe('Tier 3 Cross-Feature Interaction Pairwise Tests', () => {
     });
 
     // 3. Execute atomic lockSeatsAction via POST /api/reservations/lock
-    const lockResponse = await page.request.post('/api/reservations/lock', {
-      data: {
-        userSessionId: 'user-session-e2e-t2',
-        seatIds: selectedSeatIds,
-      },
+    const lockResponse = await page.evaluate(async (args) => {
+      const res = await fetch('/api/reservations/lock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(args)
+      });
+      return { status: res.status, json: await res.json() };
+    }, {
+      userSessionId: 'user-session-e2e-t2',
+      seatIds: selectedSeatIds,
     });
 
-    expect(lockResponse.status()).toBe(200);
-    const lockResult = await lockResponse.json();
+    expect(lockResponse.status).toBe(200);
+    const lockResult = lockResponse.json;
     expect(lockResult.success).toBe(true);
     expect(lockResult.data.status).toBe('PENDING');
 
