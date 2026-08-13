@@ -11,8 +11,11 @@ import {
 } from 'lucide-react';
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
+export interface TierDTO { id: string; name: string; color: string; basePrice: number; description?: string; salesEndDate?: string; }
+
 interface AdminSection {
   id: string;
+  tierId?: string;
   name: string;
   code: string;
   shapeType: ShapeType;
@@ -41,6 +44,13 @@ const COLORS = [
 
 const CANVAS_W = 1000;
 const CANVAS_H = 700;
+
+const DEFAULT_TIERS: TierDTO[] = [
+  { id: 'tier-vip', name: 'VIP', color: '#f59e0b', basePrice: 2000000, description: 'VIP Seating with exclusive access.', salesEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
+  { id: 'tier-gold', name: 'Gold', color: '#eab308', basePrice: 1500000, description: 'Premium seating with great views.', salesEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
+  { id: 'tier-silver', name: 'Silver', color: '#94a3b8', basePrice: 1000000, description: 'Standard seating area.', salesEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
+  { id: 'tier-bronze', name: 'Bronze', color: '#fb923c', basePrice: 500000, description: 'Economy seating.', salesEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
+];
 
 const DEFAULT_SECTION: AdminSection = {
   id: 'section-1',
@@ -73,6 +83,9 @@ const DEFAULT_SECTION: AdminSection = {
 export function AdminCanvasWorkspace() {
   const svgRef = useRef<SVGSVGElement>(null);
   const [tool, setTool] = useState<Tool>('select');
+  const [pricingTiers, setPricingTiers] = useState<TierDTO[]>(DEFAULT_TIERS);
+  const [showTierManager, setShowTierManager] = useState(false);
+  const [selectedEditTierId, setSelectedEditTierId] = useState<string | null>(null);
 
   // Initialize with one default section pre-seeded so E2E tests have something to click
   const [sections, setSections] = useState<AdminSection[]>(() => {
@@ -112,12 +125,16 @@ export function AdminCanvasWorkspace() {
         if (layout) {
           setLayoutId(layout.id);
           setLayoutName(layout.name);
+          if (layout.pricingTiers && layout.pricingTiers.length > 0) {
+            setPricingTiers(layout.pricingTiers);
+          }
           if (Array.isArray(layout.sections)) {
             const mapped = layout.sections.map((s: any) => {
               const geomObj = typeof s.geometry === 'string' ? (() => { try { return JSON.parse(s.geometry); } catch { return {}; } })() : s.geometry;
               const isStageShape = s.shapeType === 'STAGE' || geomObj?.shapeType === 'STAGE';
               return {
                 id: s.id,
+                tierId: s.pricingTierId || undefined,
                 name: s.name,
                 code: s.code,
                 shapeType: isStageShape ? 'STAGE' : s.shapeType,
@@ -549,6 +566,7 @@ export function AdminCanvasWorkspace() {
             seatsPerRow: s.seatsPerRow,
             seats: s.seats.map((seat) => ({ row: seat.row, number: seat.number, x: seat.x, y: seat.y })),
           })),
+          pricingTiers,
         }),
       });
       const data = await response.json();
@@ -593,10 +611,10 @@ export function AdminCanvasWorkspace() {
       {/* Left Toolbar */}
       <div
         data-testid="drawing-toolbar"
-        className="w-56 flex-shrink-0 flex flex-col glass border-r border-white/[0.06] admin-toolbar"
+        className="w-56 flex-shrink-0 flex flex-col glass border-r border-subtle admin-toolbar"
       >
-        <div className="p-3 border-b border-white/[0.06]">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Tools</p>
+        <div className="p-3 border-b border-subtle">
+          <p className="text-xs font-semibold text-muted uppercase tracking-widest mb-2">Tools</p>
           <div className="grid grid-cols-2 gap-1.5">
             {([
               { key: 'select', icon: MousePointer, label: 'Select' },
@@ -611,8 +629,8 @@ export function AdminCanvasWorkspace() {
                 data-testid={`tool-${key}`}
                 onClick={() => { setTool(key); setDrawing(false); setPolyPoints([]); setRectStart(null); }}
                 className={`flex flex-col items-center gap-1 py-2 px-1 rounded-lg text-xs font-medium transition-all ${tool === key
-                    ? 'bg-indigo-600 text-white'
-                    : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'
+                    ? 'bg-accent text-primary'
+                    : 'text-muted hover:bg-card border-subtle hover:text-primary'
                   }`}
               >
                 <Icon size={14} />
@@ -624,17 +642,17 @@ export function AdminCanvasWorkspace() {
 
         {/* Section list */}
         <div className="flex-1 overflow-y-auto p-3">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Sections ({sections.length})</p>
+          <p className="text-xs font-semibold text-muted uppercase tracking-widest mb-2">Sections ({sections.length})</p>
           {sections.map((s, idx) => (
             <div
               key={s.id}
               onClick={() => setSelectedId(s.id)}
-              className={`flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer mb-1 transition-all ${selectedId === s.id ? 'bg-indigo-600/20 border border-indigo-500/30' : 'hover:bg-white/[0.04]'
+              className={`flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer mb-1 transition-all ${selectedId === s.id ? 'bg-accent/20 border border-accent/30' : 'hover:bg-white/[0.04]'
                 }`}
             >
               <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: s.color }} />
               <span className="text-xs text-slate-200 flex-1 truncate">{s.name}</span>
-              <span className="text-xs text-slate-500">{s.seats.length}</span>
+              <span className="text-xs text-muted">{s.seats.length}</span>
               <button onClick={(e) => { e.stopPropagation(); deleteSection(s.id); }}
                 className="text-slate-600 hover:text-red-400 transition-colors">
                 <Trash2 size={11} />
@@ -647,11 +665,11 @@ export function AdminCanvasWorkspace() {
       {/* Center Canvas */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Canvas header */}
-        <div className="flex items-center gap-3 px-4 py-2.5 border-b border-white/[0.06] glass">
+        <div className="flex items-center gap-3 px-4 py-2.5 border-b border-subtle glass">
           <input
             value={layoutName}
             onChange={(e) => setLayoutName(e.target.value)}
-            className="bg-transparent text-sm font-semibold text-white outline-none flex-1 min-w-0"
+            className="bg-transparent text-sm font-semibold text-primary outline-none flex-1 min-w-0"
             placeholder="Layout name…"
           />
 
@@ -660,8 +678,8 @@ export function AdminCanvasWorkspace() {
             data-testid="toggle-snap-grid"
             onClick={() => setSnapToGrid((prev) => !prev)}
             className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border font-medium transition-all ${snapToGrid
-                ? 'bg-indigo-600/30 border-indigo-500/50 text-indigo-200 shadow-sm'
-                : 'bg-white/[0.04] border-white/[0.08] text-slate-400 hover:text-white'
+                ? 'bg-accent/30 border-accent/50 text-accent shadow-sm'
+                : 'bg-white/[0.04] border-default text-muted hover:text-primary'
               }`}
             title="Toggle 20px Grid Snapping"
           >
@@ -681,7 +699,7 @@ export function AdminCanvasWorkspace() {
             data-testid="save-layout-button"
             onClick={handleSave}
             disabled={saving || sections.length === 0}
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition-all disabled:opacity-40"
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-accent hover:bg-accent-hover text-primary font-medium transition-all disabled:opacity-40"
           >
             {saving ? <Loader2 size={12} className="animate-spin" /> : savedOk ? <CheckCircle size={12} /> : <Save size={12} />}
             {saving ? 'Saving…' : savedOk ? 'Saved!' : 'Save Layout'}
@@ -689,7 +707,7 @@ export function AdminCanvasWorkspace() {
         </div>
 
         {/* SVG Canvas Workspace */}
-        <div className="flex-1 relative flex items-center justify-center p-4 bg-[#07090f] overflow-hidden select-none">
+        <div className="flex-1 relative flex items-center justify-center p-4 bg-primary overflow-hidden select-none">
           <svg
             ref={svgRef}
             viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
@@ -706,24 +724,24 @@ export function AdminCanvasWorkspace() {
           >
             <defs>
               <pattern id="admin-grid-minor" width="20" height="20" patternUnits="userSpaceOnUse">
-                <path d="M 0 0 H 20 V 20 H 0 Z" fill="none" stroke="rgba(255,255,255,0.40)" strokeWidth="0.8" />
+                <path d="M 0 0 H 20 V 20 H 0 Z" fill="none" stroke="var(--border-subtle)" strokeWidth="0.8" />
               </pattern>
               <pattern id="admin-grid-major" width="100" height="100" patternUnits="userSpaceOnUse">
                 <rect width="100" height="100" fill="url(#admin-grid-minor)" />
-                <path d="M 0 0 H 100 V 100 H 0 Z" fill="none" stroke="rgba(255,255,255,0.50)" strokeWidth="1.2" />
+                <path d="M 0 0 H 100 V 100 H 0 Z" fill="none" stroke="var(--canvas-grid)" strokeWidth="1.2" />
               </pattern>
             </defs>
-            <rect width={CANVAS_W} height={CANVAS_H} fill="url(#admin-grid-major)" stroke="rgba(255,255,255,0.55)" strokeWidth="1.2" />
+            <rect width={CANVAS_W} height={CANVAS_H} fill="url(#admin-grid-major)" stroke="var(--border-default)" strokeWidth="1.2" />
 
             {/* Dimension ruler tick marks along top & left axes */}
             {Array.from({ length: Math.floor(CANVAS_W / 100) + 1 }).map((_, i) => (
-              <text key={`rx-${i}`} x={i * 100 + 4} y={14} fill="rgba(255,255,255,0.60)" fontSize="9.5" fontWeight="600" fontFamily="JetBrains Mono, monospace" style={{ pointerEvents: 'none', filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.8))' }}>
+              <text key={`rx-${i}`} x={i * 100 + 4} y={14} fill="var(--text-muted)" fontSize="9.5" fontWeight="600" fontFamily="JetBrains Mono, monospace" style={{ pointerEvents: 'none' }}>
                 {i * 100}px
               </text>
             ))}
             {Array.from({ length: Math.floor(CANVAS_H / 100) + 1 }).map((_, i) => (
               i > 0 && (
-                <text key={`ry-${i}`} x={4} y={i * 100 + 13} fill="rgba(255,255,255,0.60)" fontSize="9.5" fontWeight="600" fontFamily="JetBrains Mono, monospace" style={{ pointerEvents: 'none', filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.8))' }}>
+                <text key={`ry-${i}`} x={4} y={i * 100 + 13} fill="var(--text-muted)" fontSize="9.5" fontWeight="600" fontFamily="JetBrains Mono, monospace" style={{ pointerEvents: 'none' }}>
                   {i * 100}px
                 </text>
               )
@@ -768,9 +786,9 @@ export function AdminCanvasWorkspace() {
                   {/* Block Centroid Labels: Code, Name, and Size Measurement */}
                   <g style={{ pointerEvents: 'none' }}>
                     <text x={centroid.x} y={centroid.y - 12} textAnchor="middle"
-                      fill="#fff" fontSize="11" fontWeight="700" fontFamily="Inter, sans-serif">{s.code}</text>
+                      fill="var(--canvas-text)" fontSize="11" fontWeight="700" fontFamily="Inter, sans-serif">{s.code}</text>
                     <text x={centroid.x} y={centroid.y + 2} textAnchor="middle"
-                      fill="rgba(255,255,255,0.7)" fontSize="9" fontFamily="Inter, sans-serif">{s.name}</text>
+                      fill="var(--text-secondary)" fontSize="9" fontFamily="Inter, sans-serif">{s.name}</text>
                     {/* Size measurement label pill */}
                     <rect
                       x={centroid.x - 40}
@@ -778,15 +796,15 @@ export function AdminCanvasWorkspace() {
                       width="80"
                       height="15"
                       rx="4"
-                      fill="rgba(0,0,0,0.65)"
-                      stroke="rgba(56,189,248,0.4)"
+                      fill="var(--bg-card)"
+                      stroke="var(--border-default)"
                       strokeWidth="0.8"
                     />
                     <text
                       x={centroid.x}
                       y={centroid.y + 21}
                       textAnchor="middle"
-                      fill="#38bdf8"
+                      fill="var(--canvas-text)"
                       fontSize="8.5"
                       fontWeight="600"
                       fontFamily="JetBrains Mono, monospace"
@@ -799,13 +817,13 @@ export function AdminCanvasWorkspace() {
                   {isSelected && (
                     <g style={{ pointerEvents: 'none' }}>
                       {/* Top Width Dimension Line */}
-                      <line x1={bbox.minX} y1={bbox.minY - 10} x2={bbox.maxX} y2={bbox.minY - 10} stroke="#38bdf8" strokeWidth="1" strokeDasharray="3 2" />
-                      <text x={(bbox.minX + bbox.maxX) / 2} y={bbox.minY - 14} textAnchor="middle" fill="#38bdf8" fontSize="8.5" fontFamily="JetBrains Mono, monospace" fontWeight="600">
+                      <line x1={bbox.minX} y1={bbox.minY - 10} x2={bbox.maxX} y2={bbox.minY - 10} stroke="var(--accent-primary)" strokeWidth="1" strokeDasharray="3 2" />
+                      <text x={(bbox.minX + bbox.maxX) / 2} y={bbox.minY - 14} textAnchor="middle" fill="var(--canvas-text)" fontSize="8.5" fontFamily="JetBrains Mono, monospace" fontWeight="600">
                         {`w: ${Math.round(bbox.width)}px`}
                       </text>
                       {/* Right Height Dimension Line */}
-                      <line x1={bbox.maxX + 10} y1={bbox.minY} x2={bbox.maxX + 10} y2={bbox.maxY} stroke="#38bdf8" strokeWidth="1" strokeDasharray="3 2" />
-                      <text x={bbox.maxX + 15} y={(bbox.minY + bbox.maxY) / 2 + 3} textAnchor="start" fill="#38bdf8" fontSize="8.5" fontFamily="JetBrains Mono, monospace" fontWeight="600">
+                      <line x1={bbox.maxX + 10} y1={bbox.minY} x2={bbox.maxX + 10} y2={bbox.maxY} stroke="var(--accent-primary)" strokeWidth="1" strokeDasharray="3 2" />
+                      <text x={bbox.maxX + 15} y={(bbox.minY + bbox.maxY) / 2 + 3} textAnchor="start" fill="var(--canvas-text)" fontSize="8.5" fontFamily="JetBrains Mono, monospace" fontWeight="600">
                         {`h: ${Math.round(bbox.height)}px`}
                       </text>
                     </g>
@@ -968,12 +986,12 @@ export function AdminCanvasWorkspace() {
       {/* Right Properties Panel */}
       <div
         data-testid="section-property-editor"
-        className="w-72 flex-shrink-0 glass border-l border-white/[0.06] flex flex-col overflow-hidden property-editor-panel"
+        className="w-72 flex-shrink-0 border-l border-subtle flex flex-col overflow-hidden property-editor-panel"
       >
-        <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
+        <div className="px-4 py-3 border-b border-subtle flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Settings size={14} className="text-slate-400" />
-            <span className="text-xs font-semibold text-slate-300">Properties</span>
+            <Settings size={14} className="text-muted" />
+            <span className="text-xs font-semibold text-secondary">Properties</span>
           </div>
         </div>
         {!selectedSection ? (
@@ -982,39 +1000,6 @@ export function AdminCanvasWorkspace() {
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-            {/* Inset Color Palette Card */}
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3 flex flex-col gap-2.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-300 block">Section Color</label>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-mono text-slate-400 uppercase">{selectedSection.color}</span>
-                  <label
-                    className="relative cursor-pointer w-6 h-6 rounded-lg border border-white/20 flex items-center justify-center overflow-hidden hover:scale-105 transition-transform shadow-sm"
-                    style={{ background: selectedSection.color }}
-                  >
-                    <input
-                      type="color"
-                      value={selectedSection.color.startsWith('#') && selectedSection.color.length === 7 ? selectedSection.color : '#6366f1'}
-                      onChange={(e) => updateSection(selectedSection.id, { color: e.target.value })}
-                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                      title="Choose Custom Hex Color"
-                    />
-                  </label>
-                </div>
-              </div>
-              <div className="grid grid-cols-6 gap-2 justify-items-center max-h-36 overflow-y-auto pr-1">
-                {COLORS.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => updateSection(selectedSection.id, { color: c })}
-                    className={`w-6 h-6 rounded-full transition-all hover:scale-115 ${selectedSection.color.toLowerCase() === c.toLowerCase() ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-900 scale-110 shadow-lg' : 'opacity-85 hover:opacity-100'}`}
-                    style={{ background: c }}
-                    title={c}
-                  />
-                ))}
-              </div>
-            </div>
 
             <Field label="Name">
               <input
@@ -1023,7 +1008,7 @@ export function AdminCanvasWorkspace() {
                 data-testid="input-section-name"
                 value={selectedSection.name}
                 onChange={(e) => updateSection(selectedSection.id, { name: e.target.value })}
-                className="w-full bg-white/[0.06] text-white text-sm rounded-lg px-3 py-2 outline-none border border-white/[0.08] focus:border-indigo-500/50"
+                className="w-full bg-card border-subtle text-primary text-sm rounded-lg px-3 py-2 outline-none border border-default focus:border-accent/50"
               />
             </Field>
 
@@ -1034,26 +1019,42 @@ export function AdminCanvasWorkspace() {
                 data-testid="input-section-code"
                 value={selectedSection.code}
                 onChange={(e) => updateSection(selectedSection.id, { code: e.target.value.toUpperCase() })}
-                className="w-full bg-white/[0.06] text-white text-sm rounded-lg px-3 py-2 outline-none border border-white/[0.08] focus:border-indigo-500/50 uppercase"
+                className="w-full bg-card border-subtle text-primary text-sm rounded-lg px-3 py-2 outline-none border border-default focus:border-accent/50 uppercase"
               />
             </Field>
 
+            {/* Pricing Tier Dropdown */}
             {selectedSection.shapeType !== 'STAGE' && (
-              <Field label="Base Price">
-                <input
-                  type="number"
-                  name="basePrice"
-                  data-testid="input-section-price"
-                  value={selectedSection.price}
-                  onChange={(e) => updateSection(selectedSection.id, { price: Number(e.target.value) })}
-                  className="w-full bg-white/[0.06] text-white text-sm rounded-lg px-3 py-2 outline-none border border-white/[0.08] focus:border-indigo-500/50"
-                />
+              <Field label="Pricing Tier">
+                <div className="flex gap-2">
+                  <select
+                    value={selectedSection.tierId || ''}
+                    onChange={(e) => {
+                      const tier = pricingTiers.find(t => t.id === e.target.value);
+                      if (tier) {
+                        updateSection(selectedSection.id, { tierId: tier.id, color: tier.color, price: tier.basePrice });
+                      }
+                    }}
+                    className="flex-1 bg-card border-subtle text-primary text-sm rounded-lg px-3 py-2 outline-none border border-default focus:border-accent/50 appearance-none"
+                  >
+                    <option value="" disabled>Select a tier...</option>
+                    {pricingTiers.map(t => (
+                      <option key={t.id} value={t.id}>{t.name} (Rp {t.basePrice.toLocaleString('id-ID')})</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => setShowTierManager(true)}
+                    className="px-3 py-2 bg-card border-subtle border border-default rounded-lg text-xs font-semibold text-secondary hover:text-primary transition-colors"
+                  >
+                    Edit
+                  </button>
+                </div>
               </Field>
             )}
 
             {/* Shape Dimensions Controls (Width & Height) */}
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3 flex flex-col gap-2.5">
-              <span className="text-xs font-semibold text-slate-300">Shape Dimensions</span>
+            <div className="bg-card border-subtle border border-subtle rounded-xl p-3 flex flex-col gap-2.5">
+              <span className="text-xs font-semibold text-secondary">Shape Dimensions</span>
               <div className="grid grid-cols-2 gap-2">
                 <Field label="Width (px)">
                   <input
@@ -1066,7 +1067,7 @@ export function AdminCanvasWorkspace() {
                       const w = Math.max(20, Number(e.target.value));
                       resizeSectionShape(selectedSection.id, w, selectedBbox.height);
                     }}
-                    className="w-full bg-white/[0.06] text-white text-sm rounded-lg px-3 py-2 outline-none border border-white/[0.08] focus:border-indigo-500/50"
+                    className="w-full bg-card border-subtle text-primary text-sm rounded-lg px-3 py-2 outline-none border border-default focus:border-accent/50"
                   />
                 </Field>
                 <Field label="Height (px)">
@@ -1080,15 +1081,15 @@ export function AdminCanvasWorkspace() {
                       const h = Math.max(20, Number(e.target.value));
                       resizeSectionShape(selectedSection.id, selectedBbox.width, h);
                     }}
-                    className="w-full bg-white/[0.06] text-white text-sm rounded-lg px-3 py-2 outline-none border border-white/[0.08] focus:border-indigo-500/50"
+                    className="w-full bg-card border-subtle text-primary text-sm rounded-lg px-3 py-2 outline-none border border-default focus:border-accent/50"
                   />
                 </Field>
               </div>
             </div>
 
             {selectedSection.shapeType === 'STAGE' ? (
-              <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-3 flex flex-col gap-1 text-xs text-indigo-300">
-                <span className="font-semibold text-white">Stage Landmark</span>
+              <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-3 flex flex-col gap-1 text-xs text-accent">
+                <span className="font-semibold text-primary">Stage Landmark</span>
                 <span>Stage area contains 0 seats. Non-clickable background landmark element. This element has no price or seat availability attributes.</span>
               </div>
             ) : (
@@ -1101,14 +1102,14 @@ export function AdminCanvasWorkspace() {
                     setTempSeatsPerRow(selectedSection.seatsPerRow);
                     setShowGridConfig(!showGridConfig);
                   }}
-                  className="w-full py-2 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/20 rounded-lg text-xs font-semibold text-indigo-300 flex items-center justify-center gap-1.5 transition-all"
+                  className="w-full py-2 bg-accent/20 hover:bg-accent/30 border border-indigo-500/20 rounded-lg text-xs font-semibold text-accent flex items-center justify-center gap-1.5 transition-all"
                 >
                   <Grid3X3 size={12} />
                   Grid Setup
                 </button>
 
                 {showGridConfig && (
-                  <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3 flex flex-col gap-3">
+                  <div className="bg-card border-subtle border border-subtle rounded-xl p-3 flex flex-col gap-3">
                     <Field label="Row Count">
                       <input
                         type="number"
@@ -1116,7 +1117,7 @@ export function AdminCanvasWorkspace() {
                         data-testid="input-row-count"
                         value={tempRowCount}
                         onChange={(e) => setTempRowCount(Number(e.target.value))}
-                        className="w-full bg-white/[0.06] text-white text-sm rounded-lg px-3 py-2 outline-none border border-white/[0.08] focus:border-indigo-500/50"
+                        className="w-full bg-card border-subtle text-primary text-sm rounded-lg px-3 py-2 outline-none border border-default focus:border-accent/50"
                       />
                     </Field>
 
@@ -1127,14 +1128,14 @@ export function AdminCanvasWorkspace() {
                         data-testid="input-seats-per-row"
                         value={tempSeatsPerRow}
                         onChange={(e) => setTempSeatsPerRow(Number(e.target.value))}
-                        className="w-full bg-white/[0.06] text-white text-sm rounded-lg px-3 py-2 outline-none border border-white/[0.08] focus:border-indigo-500/50"
+                        className="w-full bg-card border-subtle text-primary text-sm rounded-lg px-3 py-2 outline-none border border-default focus:border-accent/50"
                       />
                     </Field>
 
                     <button
                       data-testid="btn-apply-grid-generator"
                       onClick={handleApplyGridGenerator}
-                      className="w-full py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-500 transition-colors"
+                      className="w-full py-2 bg-accent text-primary rounded-lg text-xs font-bold hover:bg-accent-hover transition-colors"
                     >
                       Generate
                     </button>
@@ -1142,14 +1143,14 @@ export function AdminCanvasWorkspace() {
                 )}
 
                 <div className="bg-white/[0.04] rounded-lg px-3 py-2.5">
-                  <p className="text-xs text-slate-400">Generated seats</p>
-                  <p className="text-lg font-bold text-white mt-0.5">{selectedSection.seats.length}</p>
-                  <p className="text-xs text-slate-500">inside polygon boundary</p>
+                  <p className="text-xs text-muted">Generated seats</p>
+                  <p className="text-lg font-bold text-primary mt-0.5">{selectedSection.seats.length}</p>
+                  <p className="text-xs text-muted">inside polygon boundary</p>
                 </div>
 
                 <button
                   onClick={() => updateSection(selectedSection.id, { showSeats: !selectedSection.showSeats })}
-                  className="flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors"
+                  className="flex items-center gap-2 text-xs text-muted hover:text-primary transition-colors"
                 >
                   {selectedSection.showSeats ? <EyeOff size={12} /> : <Eye size={12} />}
                   {selectedSection.showSeats ? 'Hide' : 'Show'} seat preview
@@ -1167,11 +1168,205 @@ export function AdminCanvasWorkspace() {
         )}
       </div>
 
+      {/* Tier Manager Modal */}
+      {showTierManager && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-primary border border-default rounded-2xl w-full max-w-4xl flex flex-col shadow-2xl animate-fade-in max-h-[90vh] h-[600px] overflow-hidden">
+            <div className="px-6 py-4 border-b border-subtle flex justify-between items-center bg-card border-subtle">
+              <div>
+                <h3 className="text-lg font-bold text-primary">Pricing Tiers Manager</h3>
+                <p className="text-sm text-muted">Select a tier to customize its settings, colors, and pricing.</p>
+              </div>
+              <button onClick={() => { setShowTierManager(false); setSelectedEditTierId(null); }} className="text-muted hover:text-primary transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="flex flex-1 overflow-hidden">
+              {/* Left Sidebar: List of Tiers */}
+              <div className="w-1/3 border-r border-subtle flex flex-col bg-card border-subtle overflow-hidden">
+                <div className="p-4 border-b border-subtle">
+                  <button
+                    onClick={() => {
+                      const newId = 'tier-' + Math.random().toString(36).substr(2, 6);
+                      setPricingTiers([...pricingTiers, { id: newId, name: 'New Tier', color: '#cbd5e1', basePrice: 100000 }]);
+                      setSelectedEditTierId(newId);
+                    }}
+                    className="w-full py-2 bg-accent text-white rounded-lg text-sm font-semibold hover:bg-accent-hover transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Plus size={16} />
+                    Create Tier
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                  {pricingTiers.map((tier) => (
+                    <button
+                      key={tier.id}
+                      onClick={() => setSelectedEditTierId(tier.id)}
+                      className={`w-full text-left px-4 py-3 rounded-xl flex items-center justify-between transition-all ${selectedEditTierId === tier.id ? 'bg-card border-subtle border border-default shadow-sm' : 'hover:bg-card border-subtle/50 border border-transparent'}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-4 h-4 rounded-full shadow-sm border border-black/10" style={{ backgroundColor: tier.color }} />
+                        <div>
+                          <p className="text-sm font-bold text-primary">{tier.name}</p>
+                          <p className="text-xs text-muted">Rp {tier.basePrice.toLocaleString('id-ID')}</p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                  {pricingTiers.length === 0 && (
+                    <div className="text-center text-muted text-sm py-8">No tiers found. Create one above.</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Panel: Edit Selected Tier */}
+              <div className="w-2/3 flex flex-col overflow-hidden bg-primary">
+                {selectedEditTierId && pricingTiers.find(t => t.id === selectedEditTierId) ? (() => {
+                  const idx = pricingTiers.findIndex(t => t.id === selectedEditTierId);
+                  const tier = pricingTiers[idx];
+                  return (
+                    <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                      <div className="flex items-center justify-between pb-4 border-b border-subtle">
+                        <h4 className="text-lg font-bold text-primary flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: tier.color }} />
+                          {tier.name} Settings
+                        </h4>
+                        <button 
+                          onClick={() => {
+                            setPricingTiers(pricingTiers.filter((_, i) => i !== idx));
+                            setSelectedEditTierId(null);
+                          }}
+                          className="px-3 py-1.5 text-xs text-red-500 hover:bg-red-500/10 rounded-lg transition-colors flex items-center gap-1.5"
+                        >
+                          <Trash2 size={14} /> Delete Tier
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-5">
+                        <Field label="Tier Name">
+                          <input
+                            type="text"
+                            value={tier.name}
+                            onChange={(e) => {
+                              const newTiers = [...pricingTiers];
+                              newTiers[idx].name = e.target.value;
+                              setPricingTiers(newTiers);
+                            }}
+                            className="w-full bg-card border-subtle text-primary text-sm rounded-lg px-3 py-2 outline-none border border-default focus:border-accent/50"
+                          />
+                        </Field>
+
+                        <Field label="Base Price (Rp)">
+                          <input
+                            type="number"
+                            value={tier.basePrice}
+                            onChange={(e) => {
+                              const newPrice = Number(e.target.value);
+                              const newTiers = [...pricingTiers];
+                              newTiers[idx].basePrice = newPrice;
+                              setPricingTiers(newTiers);
+                              setSections(prev => prev.map(s => s.tierId === tier.id ? { ...s, price: newPrice } : s));
+                            }}
+                            className="w-full bg-card border-subtle text-primary text-sm rounded-lg px-3 py-2 outline-none border border-default focus:border-accent/50"
+                          />
+                        </Field>
+                        
+                        <div className="col-span-2">
+                          <Field label="Tier Color">
+                            <div className="flex items-center gap-4 bg-card border-subtle border border-default rounded-xl p-3">
+                              <label
+                                className="relative cursor-pointer w-10 h-10 rounded-lg border border-black/10 flex items-center justify-center overflow-hidden hover:scale-105 transition-transform shadow-sm"
+                                style={{ background: tier.color }}
+                              >
+                                <input
+                                  type="color"
+                                  value={tier.color.startsWith('#') && tier.color.length === 7 ? tier.color : '#6366f1'}
+                                  onChange={(e) => {
+                                    const newColor = e.target.value;
+                                    const newTiers = [...pricingTiers];
+                                    newTiers[idx].color = newColor;
+                                    setPricingTiers(newTiers);
+                                    setSections(prev => prev.map(s => s.tierId === tier.id ? { ...s, color: newColor } : s));
+                                  }}
+                                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                  title="Pick Custom Color"
+                                />
+                              </label>
+                              
+                              <div className="h-8 w-px bg-default mx-1" />
+                              
+                              <div className="flex gap-2 flex-wrap">
+                                {['#f59e0b', '#eab308', '#94a3b8', '#fb923c', '#3b82f6', '#ef4444', '#10b981', '#8b5cf6', '#ec4899', '#0ea5e9'].map((c) => (
+                                  <button
+                                    key={c}
+                                    type="button"
+                                    onClick={() => {
+                                      const newTiers = [...pricingTiers];
+                                      newTiers[idx].color = c;
+                                      setPricingTiers(newTiers);
+                                      setSections(prev => prev.map(s => s.tierId === tier.id ? { ...s, color: c } : s));
+                                    }}
+                                    className={`w-8 h-8 rounded-full transition-all hover:scale-110 ${tier.color.toLowerCase() === c.toLowerCase() ? 'ring-2 ring-primary ring-offset-2 ring-offset-secondary scale-110 shadow-sm' : 'opacity-90 hover:opacity-100'}`}
+                                    style={{ backgroundColor: c }}
+                                    title={c}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          </Field>
+                        </div>
+
+                        <div className="col-span-2">
+                          <Field label="Description & Perks">
+                            <textarea
+                              value={tier.description || ''}
+                              onChange={(e) => {
+                                const newTiers = [...pricingTiers];
+                                newTiers[idx].description = e.target.value;
+                                setPricingTiers(newTiers);
+                              }}
+                              rows={3}
+                              className="w-full bg-card border-subtle text-primary text-sm rounded-lg px-3 py-2 outline-none border border-default focus:border-accent/50 resize-y"
+                              placeholder="e.g. VIP seating with backstage access..."
+                            />
+                          </Field>
+                        </div>
+
+                        <div className="col-span-2">
+                          <Field label="Sales End Date">
+                            <input
+                              type="datetime-local"
+                              value={tier.salesEndDate ? new Date(tier.salesEndDate).toISOString().slice(0, 16) : ''}
+                              onChange={(e) => {
+                                const newTiers = [...pricingTiers];
+                                newTiers[idx].salesEndDate = e.target.value ? new Date(e.target.value).toISOString() : undefined;
+                                setPricingTiers(newTiers);
+                              }}
+                              className="w-full bg-card border-subtle text-primary text-sm rounded-lg px-3 py-2 outline-none border border-default focus:border-accent/50"
+                            />
+                          </Field>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })() : (
+                  <div className="flex-1 flex items-center justify-center text-muted flex-col gap-3">
+                    <Settings size={32} className="opacity-20" />
+                    <p>Select a tier from the left to edit its details</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Toast notifications */}
       {savedOk && (
         <div
           data-testid="toast-notification"
-          className="toast-success fixed bottom-4 right-4 bg-emerald-600 text-white px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 animate-fade-in z-50 text-xs font-medium"
+          className="toast-success fixed bottom-4 right-4 bg-emerald-600 text-primary px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 animate-fade-in z-50 text-xs font-medium"
         >
           <CheckCircle size={14} />
           Layout saved successfully!
@@ -1181,7 +1376,7 @@ export function AdminCanvasWorkspace() {
       {saveError && (
         <div
           data-testid="toast-notification-error"
-          className="toast-error fixed bottom-4 right-4 bg-red-600/90 text-white px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 animate-fade-in z-50 text-xs font-medium border border-red-500/50 max-w-xs"
+          className="toast-error fixed bottom-4 right-4 bg-red-600/90 text-primary px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 animate-fade-in z-50 text-xs font-medium border border-red-500/50 max-w-xs"
         >
           <X size={14} />
           {saveError}
@@ -1194,7 +1389,7 @@ export function AdminCanvasWorkspace() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="text-xs text-slate-400 block mb-1.5">{label}</label>
+      <label className="text-xs text-muted block mb-1.5">{label}</label>
       {children}
     </div>
   );

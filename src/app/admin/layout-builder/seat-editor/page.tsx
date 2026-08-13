@@ -235,8 +235,8 @@ function SeatEditorWorkspace() {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-[#07090f] text-slate-400 gap-2">
-        <Loader2 className="animate-spin text-indigo-400" size={24} />
+      <div className="h-screen flex items-center justify-center bg-primary text-secondary gap-2">
+        <Loader2 className="animate-spin text-accent" size={24} />
         <span className="text-base">Loading layout simulation…</span>
       </div>
     );
@@ -244,9 +244,9 @@ function SeatEditorWorkspace() {
 
   if (error && !sections.length) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center bg-[#07090f] text-slate-400 gap-4">
-        <p className="text-red-400 font-semibold">{error}</p>
-        <Link href="/admin" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm">
+      <div className="h-screen flex flex-col items-center justify-center bg-primary text-secondary gap-4">
+        <p className="text-accent font-semibold">{error}</p>
+        <Link href="/admin" className="px-4 py-2 bg-accent hover:bg-accent-hover text-primary rounded-lg text-sm">
           Return to Dashboard
         </Link>
       </div>
@@ -267,24 +267,24 @@ function SeatEditorWorkspace() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-[#07090f] text-white">
+    <div className="flex flex-col h-screen bg-primary text-primary">
       {/* Top Header */}
-      <header className="glass border-b border-white/[0.06] px-6 py-3 flex items-center justify-between flex-shrink-0 z-10">
+      <header className="glass border-b border-subtle px-6 py-3 flex items-center justify-between flex-shrink-0 z-10">
         <div className="flex items-center gap-4">
-          <Link href={`/admin/layout-builder?layoutId=${layoutId}`} className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-sm">
+          <Link href={`/admin/layout-builder?layoutId=${layoutId}`} className="flex items-center gap-1.5 text-secondary hover:text-primary transition-colors text-sm">
             <ArrowLeft size={14} />
             Back to Geometry Builder
           </Link>
-          <div className="h-4 w-px bg-white/10" />
-          <h1 className="text-sm font-semibold text-white">Seat Simulator & Editor: <span className="text-indigo-400">{layoutName}</span></h1>
+          <div className="h-4 w-px hover:bg-accent hover:text-white" />
+          <h1 className="text-sm font-semibold text-primary">Seat Simulator & Editor: <span className="text-accent">{layoutName}</span></h1>
         </div>
 
         <div className="flex items-center gap-2">
-          {error && <span className="text-xs text-red-400 mr-2">{error}</span>}
+          {error && <span className="text-xs text-accent mr-2">{error}</span>}
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-lg shadow-indigo-600/10"
+            className="px-4 py-1.5 bg-accent hover:bg-accent-hover disabled:bg-card disabled:text-muted rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-lg shadow-none"
           >
             {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
             {saving ? 'Saving Configurations…' : 'Save Seating Layout'}
@@ -297,11 +297,11 @@ function SeatEditorWorkspace() {
         {/* Visual Map Canvas Workspace */}
         <div
           className="flex-1 relative flex items-center justify-center p-8 transition-colors duration-500 overflow-hidden select-none"
-          style={{ background: selectedSectionId ? 'radial-gradient(ellipse at center, #0c1322 0%, #070a12 100%)' : '#0a0d16' }}
+          style={{ background: "var(--bg-primary)" }}
         >
           {selectedSection ? (
             <div className="w-full h-full flex flex-col items-center justify-center overflow-hidden">
-              <div className="w-full max-w-4xl h-[72vh] flex flex-col bg-[#090d16]/30 border border-white/[0.06] rounded-2xl p-4 shadow-2xl relative select-none">
+              <div className="w-full max-w-4xl h-[72vh] flex flex-col bg-[#090d16]/30 border border-subtle rounded-2xl p-4 shadow-2xl relative select-none">
                 <SeatGridPicker
                   section={selectedSection as any}
                   seats={selectedSection.seats as any}
@@ -317,17 +317,17 @@ function SeatEditorWorkspace() {
           ) : (
             <>
               {/* Legend indicator */}
-              <div className="absolute top-4 left-4 glass px-3 py-2 border border-white/[0.06] rounded-xl text-[10px] text-slate-400 flex flex-col gap-1.5 shadow-lg z-20">
-                <span className="font-semibold text-slate-200">Simulation View:</span>
+              <div className="absolute top-4 left-4 glass px-3 py-2 border border-subtle rounded-xl text-[10px] text-secondary flex flex-col gap-1.5 shadow-lg z-20">
+                <span className="font-semibold text-secondary">Simulation View:</span>
                 <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded bg-indigo-500" />
+                  <span className="w-2.5 h-2.5 rounded bg-accent" />
                   <span>Active Seat (Click to disable)</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full border border-dashed border-indigo-500 bg-indigo-500/15" />
+                  <span className="w-2.5 h-2.5 rounded-full border border-dashed border-accent bg-accent/15" />
                   <span>Disabled/Gap Seat (Click to restore)</span>
                 </div>
-                <div className="flex items-center gap-1.5 mt-1 border-t border-white/[0.04] pt-1">
+                <div className="flex items-center gap-1.5 mt-1 border-t border-subtle pt-1">
                   <span>{selectedSectionId ? '🔍 Zoomed Section Mode' : '🗺️ Full Map Mode (Click section shape)'}</span>
                 </div>
               </div>
@@ -357,7 +357,7 @@ function SeatEditorWorkspace() {
                       {(!selectedSectionId || isSelected) && (
                         <g style={{ pointerEvents: 'none' }}>
                           <text x={centroid.x} y={centroid.y - 8} textAnchor="middle"
-                            fill="#fff" fontSize="11" fontWeight="700" fontFamily="Inter, sans-serif">{s.code}</text>
+                            fill="var(--text-primary)" fontSize="11" fontWeight="700" fontFamily="Inter, sans-serif">{s.code}</text>
                           <text x={centroid.x} y={centroid.y + 8} textAnchor="middle"
                             fill="rgba(255,255,255,0.5)" fontSize="9" fontFamily="Inter, sans-serif">{s.name}</text>
                         </g>
@@ -386,18 +386,18 @@ function SeatEditorWorkspace() {
         </div>
 
         {/* Right properties panel */}
-        <div className="w-80 flex-shrink-0 flex flex-col glass border-l border-white/[0.06] p-4 gap-4 overflow-y-auto">
+        <div className="w-80 flex-shrink-0 flex flex-col glass border-l border-subtle p-4 gap-4 overflow-y-auto">
           {selectedSection ? (
             <div className="flex flex-col gap-4 h-full">
               {/* Header zoom details */}
-              <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+              <div className="flex items-center justify-between border-b border-subtle pb-3">
                 <div className="flex flex-col">
-                  <span className="text-xs text-slate-400">Zoomed Section</span>
-                  <span className="text-sm font-bold text-white mt-0.5">{selectedSection.name} ({selectedSection.code})</span>
+                  <span className="text-xs text-secondary">Zoomed Section</span>
+                  <span className="text-sm font-bold text-primary mt-0.5">{selectedSection.name} ({selectedSection.code})</span>
                 </div>
                 <button
                   onClick={() => setSelectedSectionId(null)}
-                  className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors"
+                  className="p-1.5 bg-secondary hover:bg-accent hover:text-white rounded-lg text-secondary hover:text-primary transition-colors"
                   title="Back to venue map"
                 >
                   <X size={14} />
@@ -405,12 +405,12 @@ function SeatEditorWorkspace() {
               </div>
 
               {selectedSection.shapeType === 'STAGE' ? (
-                <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 flex flex-col gap-2.5 text-indigo-300">
-                  <div className="flex items-center gap-2 font-semibold text-white">
-                    <Grid3X3 size={16} className="text-indigo-400" />
+                <div className="bg-accent/10 border border-accent/20 rounded-xl p-4 flex flex-col gap-2.5 text-accent">
+                  <div className="flex items-center gap-2 font-semibold text-primary">
+                    <Grid3X3 size={16} className="text-accent" />
                     <span>Stage Landmark</span>
                   </div>
-                  <p className="text-xs text-slate-400 leading-relaxed">
+                  <p className="text-xs text-secondary leading-relaxed">
                     This element represents the venue stage landmark for spatial positioning. A stage contains 0 seats and possesses no price or booking attributes.
                   </p>
                 </div>
@@ -418,12 +418,12 @@ function SeatEditorWorkspace() {
                 <>
                   {/* Base Info metrics */}
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-white/[0.03] rounded-xl p-3 border border-white/[0.04]">
-                      <span className="text-[10px] text-slate-400 block">Row Count</span>
+                    <div className="bg-secondary rounded-xl p-3 border border-subtle">
+                      <span className="text-[10px] text-secondary block">Row Count</span>
                       <span className="text-sm font-bold mt-0.5">{selectedSection.rowCount}</span>
                     </div>
-                    <div className="bg-white/[0.03] rounded-xl p-3 border border-white/[0.04]">
-                      <span className="text-[10px] text-slate-400 block">Seats Per Row</span>
+                    <div className="bg-secondary rounded-xl p-3 border border-subtle">
+                      <span className="text-[10px] text-secondary block">Seats Per Row</span>
                       <span className="text-sm font-bold mt-0.5">{selectedSection.seatsPerRow}</span>
                     </div>
                   </div>
@@ -443,16 +443,16 @@ function SeatEditorWorkspace() {
                           geometry: updatedGeom,
                         });
                       }}
-                      className="w-4 h-4 rounded border-white/[0.08] bg-white/[0.06] text-indigo-600 focus:ring-indigo-500/50 cursor-pointer"
+                      className="w-4 h-4 rounded border-default bg-secondary text-accent focus:ring-accent/50 cursor-pointer"
                     />
-                    <label htmlFor="clipToBoundary" className="text-xs text-slate-300 cursor-pointer select-none">
+                    <label htmlFor="clipToBoundary" className="text-xs text-secondary cursor-pointer select-none">
                       Clip seats to shape boundary
                     </label>
                   </div>
 
                   {/* Row configuration adjusters */}
-                  <div className="border border-white/[0.08] rounded-xl p-3 flex flex-col gap-2">
-                    <span className="text-xs font-semibold text-slate-300">Adjust Seats per Row</span>
+                  <div className="border border-default rounded-xl p-3 flex flex-col gap-2">
+                    <span className="text-xs font-semibold text-secondary">Adjust Seats per Row</span>
                     <div className="max-h-56 overflow-y-auto flex flex-col gap-2 pr-1">
                       {Array.from({ length: selectedSection.rowCount }).map((_, r) => {
                         const rowLabel = getRowLabel(r);
@@ -478,13 +478,13 @@ function SeatEditorWorkspace() {
                         };
 
                         return (
-                          <div key={rowLabel} className="flex items-center justify-between text-xs py-1 border-b border-white/[0.04]">
+                          <div key={rowLabel} className="flex items-center justify-between text-xs py-1 border-b border-subtle">
                             <div className="flex items-center gap-1.5">
-                              <span className="text-slate-400 font-medium">Row {rowLabel}</span>
+                              <span className="text-secondary font-medium">Row {rowLabel}</span>
                               <button
                                 type="button"
                                 onClick={() => handleToggleRow(selectedSection.id, rowLabel)}
-                                className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition-colors"
+                                className="text-[10px] px-1.5 py-0.5 rounded glass hover:bg-accent hover:text-white text-accent border border-accent/20 transition-colors"
                                 title={`Toggle delete/restore full Row ${rowLabel}`}
                               >
                                 Delete Row
@@ -493,7 +493,7 @@ function SeatEditorWorkspace() {
                             <div className="flex items-center gap-1.5">
                               <button
                                 onClick={() => handleUpdateRowCount(currentCount - 1)}
-                                className="w-5 h-5 rounded bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-300 transition-colors"
+                                className="w-5 h-5 rounded bg-secondary hover:bg-accent hover:text-white flex items-center justify-center text-secondary transition-colors"
                               >
                                 -
                               </button>
@@ -501,11 +501,11 @@ function SeatEditorWorkspace() {
                                 type="number"
                                 value={currentCount}
                                 onChange={(e) => handleUpdateRowCount(Number(e.target.value))}
-                                className="w-10 bg-white/[0.04] text-center text-white py-0.5 rounded border border-white/[0.06] outline-none text-[10px]"
+                                className="w-10 bg-secondary text-center text-primary py-0.5 rounded border border-subtle outline-none text-[10px]"
                               />
                               <button
                                 onClick={() => handleUpdateRowCount(currentCount + 1)}
-                                className="w-5 h-5 rounded bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-300 transition-colors"
+                                className="w-5 h-5 rounded bg-secondary hover:bg-accent hover:text-white flex items-center justify-center text-secondary transition-colors"
                               >
                                 +
                               </button>
@@ -531,17 +531,17 @@ function SeatEditorWorkspace() {
                             },
                           });
                         }}
-                        className="w-full py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 rounded-lg text-xs font-semibold transition-all"
+                        className="w-full py-1.5 glass hover:bg-accent hover:text-white border border-accent/20 text-accent rounded-lg text-xs font-semibold transition-all"
                       >
                         Reset Custom Grid
                       </button>
                     )}
 
                   {/* Metric indicator */}
-                  <div className="bg-white/[0.04] rounded-xl px-3 py-2.5 mt-auto">
-                    <p className="text-[10px] text-slate-400">Total Bookable Seats</p>
-                    <p className="text-xl font-bold text-white mt-0.5">{selectedSection.seats.length}</p>
-                    <p className="text-[9px] text-slate-500">Excluding disabled aisles / layout gaps</p>
+                  <div className="bg-secondary rounded-xl px-3 py-2.5 mt-auto">
+                    <p className="text-[10px] text-secondary">Total Bookable Seats</p>
+                    <p className="text-xl font-bold text-primary mt-0.5">{selectedSection.seats.length}</p>
+                    <p className="text-[9px] text-muted">Excluding disabled aisles / layout gaps</p>
                   </div>
                 </>
               )}
@@ -549,16 +549,16 @@ function SeatEditorWorkspace() {
               {/* Back to map action */}
               <button
                 onClick={() => setSelectedSectionId(null)}
-                className="w-full py-2 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/20 rounded-lg text-xs font-semibold text-indigo-300 flex items-center justify-center gap-1.5 transition-all mt-1"
+                className="w-full py-2 glass hover:bg-accent hover:text-white border border-accent/20 rounded-lg text-xs font-semibold text-accent flex items-center justify-center gap-1.5 transition-all mt-1"
               >
                 Apply & Back to Venue Map
               </button>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-slate-400 text-center gap-2 p-4">
-              <Grid3X3 size={28} className="text-indigo-400 opacity-60 animate-pulse" />
-              <span className="text-xs font-medium text-slate-300 mt-2">No Section Selected</span>
-              <p className="text-[10px] text-slate-500">Click on any section layout shape on the map canvas simulation to zoom in and customize its seating grid.</p>
+            <div className="flex flex-col items-center justify-center h-full text-secondary text-center gap-2 p-4">
+              <Grid3X3 size={28} className="text-accent opacity-60 animate-pulse" />
+              <span className="text-xs font-medium text-secondary mt-2">No Section Selected</span>
+              <p className="text-[10px] text-muted">Click on any section layout shape on the map canvas simulation to zoom in and customize its seating grid.</p>
             </div>
           )}
         </div>
@@ -568,7 +568,7 @@ function SeatEditorWorkspace() {
       {savedOk && (
         <div
           data-testid="toast-notification"
-          className="toast-success fixed bottom-4 right-4 bg-emerald-600 text-white px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 animate-fade-in z-50 text-xs font-medium"
+          className="toast-success fixed bottom-4 right-4 bg-accent text-primary px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 animate-fade-in z-50 text-xs font-medium"
         >
           <CheckCircle size={14} />
           Seating layout configured successfully!
@@ -581,8 +581,8 @@ function SeatEditorWorkspace() {
 export default function AdminLayoutBuilderSeatEditorPage() {
   return (
     <Suspense fallback={
-      <div className="h-screen flex items-center justify-center bg-[#07090f] text-slate-400 gap-2">
-        <Loader2 className="animate-spin text-indigo-400" size={24} />
+      <div className="h-screen flex items-center justify-center bg-primary text-secondary gap-2">
+        <Loader2 className="animate-spin text-accent" size={24} />
         <span className="text-base">Loading seating configuration workspace…</span>
       </div>
     }>

@@ -14,6 +14,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ even
           startTime: new Date().toISOString(),
           viewBoxWidth: eventId === 'event-extreme' ? 10000 : 1000,
           viewBoxHeight: eventId === 'event-extreme' ? 10000 : 700,
+          layout: {
+            pricingTiers: [
+              { id: 'tier-vip', name: 'VIP', color: '#f59e0b', basePrice: 2000000, description: 'VIP Seating with exclusive access.', salesEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
+              { id: 'tier-gold', name: 'Gold', color: '#eab308', basePrice: 1500000, description: 'Premium seating with great views.', salesEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
+              { id: 'tier-silver', name: 'Silver', color: '#94a3b8', basePrice: 1000000, description: 'Standard seating area.', salesEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
+              { id: 'tier-bronze', name: 'Bronze', color: '#fb923c', basePrice: 500000, description: 'Economy seating.', salesEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
+            ]
+          },
           sections: [
             {
               id: 'sec-rect-101',
@@ -21,7 +29,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ even
               code: 'ORCH',
               shapeType: 'RECTANGLE',
               color: '#3B82F6',
-              price: 75,
+              price: 75000,
               totalSeats: 20,
               availableSeats: 18,
               rowCount: 4,
@@ -38,7 +46,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ even
                   x: 130 + (i % 5) * 35,
                   y: 130 + Math.floor(i / 5) * 35,
                   status,
-                  price: 75,
+                  price: 75000,
                 };
               }),
               geometry: {

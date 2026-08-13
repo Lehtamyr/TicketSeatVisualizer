@@ -66,6 +66,7 @@ export async function POST(request: Request) {
             color: section.color,
             rowCount: isStage ? 0 : section.rowCount,
             seatsPerRow: isStage ? 0 : section.seatsPerRow,
+            pricingTierId: section.pricingTierId,
           },
         });
 
@@ -78,6 +79,7 @@ export async function POST(request: Request) {
               x: seat.x,
               y: seat.y,
               status: 'AVAILABLE',
+              pricingTierId: seat.pricingTierId,
             })),
           });
         }

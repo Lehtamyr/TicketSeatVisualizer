@@ -22,6 +22,8 @@ export interface PricingTierDTO {
   name: string;
   color: string;
   basePrice: number;
+  description?: string;
+  salesEndDate?: string;
 }
 
 export interface SectionDTO {
@@ -32,6 +34,7 @@ export interface SectionDTO {
   geometry: SectionGeometry;
   price: number;
   color: string;
+  tierId?: string;
   tierName?: string;
   tierColor?: string;
   totalSeats: number;
@@ -59,6 +62,7 @@ export interface EventDTO {
   viewBoxWidth: number;
   viewBoxHeight: number;
   sections: SectionDTO[];
+  layout?: any;
 }
 
 export interface SaveLayoutInput {
@@ -72,11 +76,20 @@ export interface SaveLayoutInput {
     code: string;
     shapeType: ShapeType;
     geometry: SectionGeometry;
+    tierId?: string; // Replaces raw price and color, though we can still send them as fallback
     price: number;
     color: string;
     rowCount: number;
     seatsPerRow: number;
     seats: { row: string; number: number; x: number; y: number }[];
+  }[];
+  pricingTiers?: {
+    id?: string;
+    name: string;
+    color: string;
+    basePrice: number;
+    description?: string;
+    salesEndDate?: string;
   }[];
 }
 

@@ -56,14 +56,19 @@ model VenueLayout {
   updatedAt    DateTime  @updatedAt
   sections     Section[]
   events       Event[]
+  pricingTiers PricingTier[]
 }
 
 model PricingTier {
-  id        String    @id @default(uuid())
-  name      String
-  color     String
-  basePrice Float
-  sections  Section[]
+  id        String       @id @default(uuid())
+  layoutId  String?
+  layout    VenueLayout? @relation(fields: [layoutId], references: [id], onDelete: Cascade)
+  name         String
+  color        String
+  basePrice    Float
+  description  String?
+  salesEndDate DateTime?
+  sections     Section[]
   seats     Seat[]
 }
 

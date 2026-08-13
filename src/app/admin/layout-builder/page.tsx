@@ -12,22 +12,22 @@ export const metadata: Metadata = {
 export default function AdminLayoutBuilderPage() {
   return (
     <div className="flex flex-col" style={{ height: '100vh' }}>
-      <header className="glass border-b border-white/[0.06] px-6 py-3 flex items-center gap-4 flex-shrink-0">
-        <Link href="/" className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-sm">
+      <header className="glass border-b border-subtle px-6 py-3 flex items-center gap-4 flex-shrink-0">
+        <Link href="/" className="flex items-center gap-1.5 text-secondary hover:text-primary transition-colors text-sm">
           <ArrowLeft size={14} />
           Home
         </Link>
-        <div className="h-4 w-px bg-white/10" />
+        <div className="h-4 w-px hover:bg-accent hover:text-white" />
         <div className="flex items-center gap-2">
-          <Layers size={15} className="text-indigo-400" />
-          <h1 className="text-sm font-semibold text-white">Venue Layout Builder</h1>
+          <Layers size={15} className="text-accent" />
+          <h1 className="text-sm font-semibold text-primary">Venue Layout Builder</h1>
         </div>
-        <p className="text-xs text-slate-500 ml-2">Draw sections → Configure → Save to Database</p>
+        <p className="text-xs text-muted ml-2">Draw sections → Configure → Save to Database</p>
       </header>
       <main className="flex-1 overflow-hidden">
         <Suspense fallback={
-          <div className="h-full flex items-center justify-center bg-[#07090f] text-slate-400 gap-2">
-            <Loader2 className="animate-spin text-indigo-400" size={16} />
+          <div className="h-full flex items-center justify-center bg-primary text-secondary gap-2">
+            <Loader2 className="animate-spin text-accent" size={16} />
             <span className="text-sm">Loading workspace…</span>
           </div>
         }>

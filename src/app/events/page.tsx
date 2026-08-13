@@ -11,15 +11,15 @@ export default async function EventsPage() {
   return (
     <div className="min-h-screen px-6 py-10 max-w-5xl mx-auto">
       <div className="mb-10 animate-fade-in">
-        <Link href="/" className="inline-flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-sm mb-4">
+        <Link href="/" className="inline-flex items-center gap-1.5 text-secondary hover:text-primary transition-colors text-sm mb-4">
           ← Back to Home
         </Link>
         <h1 className="text-4xl font-bold gradient-text mb-2">Live Events</h1>
-        <p className="text-slate-400">Select an event to choose your seats</p>
+        <p className="text-secondary">Select an event to choose your seats</p>
       </div>
 
       {events.length === 0 ? (
-        <div className="text-center py-24 text-slate-500">
+        <div className="text-center py-24 text-muted">
           <Ticket size={48} className="mx-auto mb-4 opacity-20" />
           <p className="text-lg">No events available</p>
           <p className="text-sm mt-1">Check back later or seed the database</p>
@@ -35,19 +35,19 @@ export default async function EventsPage() {
               <Link
                 key={event.id}
                 href={`/events/${event.id}`}
-                className="glass rounded-2xl p-6 hover:border-indigo-500/40 transition-all duration-300 group block"
+                className="glass rounded-2xl p-6 hover:accent-hover/40 transition-all duration-300 group block"
                 style={{ animationDelay: `${i * 60}ms` }}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <h2 className="text-lg font-semibold text-white group-hover:text-indigo-300 transition-colors truncate">
+                    <h2 className="text-lg font-semibold text-primary group-hover:text-accent-hover transition-colors truncate">
                       {event.title}
                     </h2>
-                    <div className="flex items-center gap-1.5 mt-1.5 text-slate-400 text-sm">
+                    <div className="flex items-center gap-1.5 mt-1.5 text-secondary text-sm">
                       <MapPin size={12} />
                       <span className="truncate">{event.venueName}</span>
                     </div>
-                    <div className="flex items-center gap-1.5 mt-1 text-slate-400 text-sm">
+                    <div className="flex items-center gap-1.5 mt-1 text-secondary text-sm">
                       <Calendar size={12} />
                       <span>{new Date(event.startTime).toLocaleDateString('en-US', {
                         weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
@@ -55,22 +55,22 @@ export default async function EventsPage() {
                       })}</span>
                     </div>
                   </div>
-                  <ChevronRight size={20} className="text-slate-500 group-hover:text-indigo-400 transition-colors mt-1 flex-shrink-0" />
+                  <ChevronRight size={20} className="text-muted group-hover:text-accent-hover transition-colors mt-1 flex-shrink-0" />
                 </div>
 
                 <div className="mt-5">
                   <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-xs text-slate-400">Availability</span>
-                    <span className={`text-xs font-semibold ${pct < 20 ? 'text-red-400' : pct < 50 ? 'text-amber-400' : 'text-cyan-400'}`}>
+                    <span className="text-xs text-secondary">Availability</span>
+                    <span className={`text-xs font-semibold ${pct < 20 ? 'text-accent' : pct < 50 ? 'text-accent' : 'text-accent'}`}>
                       {availableSeats.toLocaleString()} / {totalSeats.toLocaleString()} seats
                     </span>
                   </div>
-                  <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+                  <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all duration-500"
                       style={{
                         width: `${pct}%`,
-                        background: pct < 20 ? '#ef4444' : pct < 50 ? '#f59e0b' : '#22d3ee',
+                        background: 'var(--accent-primary)',
                       }}
                     />
                   </div>
@@ -85,7 +85,7 @@ export default async function EventsPage() {
                     </span>
                   ))}
                   {event.sections.filter((sec) => sec.shapeType !== 'STAGE' && sec.geometry?.shapeType !== 'STAGE').length > 5 && (
-                    <span className="text-xs text-slate-500">+{event.sections.filter((sec) => sec.shapeType !== 'STAGE' && sec.geometry?.shapeType !== 'STAGE').length - 5} more</span>
+                    <span className="text-xs text-muted">+{event.sections.filter((sec) => sec.shapeType !== 'STAGE' && sec.geometry?.shapeType !== 'STAGE').length - 5} more</span>
                   )}
                 </div>
               </Link>

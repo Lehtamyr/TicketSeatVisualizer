@@ -41,6 +41,7 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
   const [seats, setSeats] = useState<SeatDTO[]>([]);
   const [loadingSeats, setLoadingSeats] = useState(false);
   const [selectedSeatIds, setSelectedSeatIds] = useState<Set<string>>(new Set());
+  const [globalCart, setGlobalCart] = useState<Map<string, SeatDTO>>(new Map());
 
   const fetchLiveSectionSeats = useCallback(async (sectionId: string): Promise<SeatDTO[]> => {
     try {
@@ -58,7 +59,6 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
     if (section.shapeType === 'STAGE' || section.geometry?.shapeType === 'STAGE') return;
     setSelectedSection(section);
     setView('seats');
-    setSelectedSeatIds(new Set());
 
     setLoadingSeats(true);
     try {
@@ -91,6 +91,14 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
       else next.add(seat.id);
       return next;
     });
+    
+    setGlobalCart((prev) => {
+      const next = new Map(prev);
+      if (isDeselecting) next.delete(seat.id);
+      else next.set(seat.id, seat);
+      return next;
+    });
+
     // Optimistically mark deselected seat as AVAILABLE in local state
     if (isDeselecting) {
       setSeats((prev) => prev.map((s) =>
@@ -102,6 +110,11 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
   const handleClearSeat = useCallback((seatId: string) => {
     setSelectedSeatIds((prev) => {
       const next = new Set(prev);
+      next.delete(seatId);
+      return next;
+    });
+    setGlobalCart((prev) => {
+      const next = new Map(prev);
       next.delete(seatId);
       return next;
     });
@@ -121,24 +134,11 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
   }, [selectedSection, fetchLiveSectionSeats]);
 
   const handleBackToMap = useCallback(() => {
-    // Only release locks if we have a real client-side session ID (not SSR placeholder).
-    if (sessionId && sessionId !== 'sess-ssr') {
-      fetch('/api/reservations/lock', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          eventId: event.id,
-          seatIds: [],
-          userSessionId: sessionId,
-        }),
-      }).catch((err) => console.error('Failed to release locks on back:', err));
-    }
-
     setView('map');
     setSelectedSection(null);
     setSeats([]);
-    lastLockedIdsRef.current = [];
-    setSelectedSeatIds(new Set());
+    // lastLockedIdsRef.current = [];
+    // setSelectedSeatIds(new Set());
   }, [event.id, sessionId]);
 
   // Real-time Server-Sent Events (SSE) listener & fallback polling
@@ -299,16 +299,66 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
     }) as SeatDTO[];
   }, [seats, selectedSection]);
 
-  const selectedSeatObjects = effectiveSeats.filter((s: SeatDTO) => selectedSeatIds.has(s.id));
+  const selectedSeatObjects = Array.from(globalCart.values());
+
+  const activeTiers = useMemo(() => {
+    let baseTiers: any[] = [];
+    
+    if (event.layout?.pricingTiers && event.layout.pricingTiers.length > 0) {
+      baseTiers = [...event.layout.pricingTiers];
+      
+      // If there are still sections that don't belong to any of the formal tiers, group them into a fallback tier.
+      const sectionsWithoutTiers = event.sections.filter(sec => 
+        sec.shapeType !== 'STAGE' && !baseTiers.find(t => t.id === sec.tierId || t.name === sec.tierName)
+      );
+      if (sectionsWithoutTiers.length > 0) {
+        const lowestPrice = Math.min(...sectionsWithoutTiers.map(s => s.price || 0));
+        baseTiers.push({
+          id: 'tier-economy-fallback',
+          name: 'Standard Tier',
+          color: 'var(--text-muted)',
+          basePrice: lowestPrice,
+          description: 'Standard event seating.',
+        });
+      }
+    } else {
+      // Robust Fallback Logic: group sections by distinct prices
+      const priceGroups = new Map<number, any[]>();
+      event.sections.forEach(sec => {
+        if (sec.shapeType === 'STAGE') return;
+        const p = sec.price || 0;
+        if (!priceGroups.has(p)) priceGroups.set(p, []);
+        priceGroups.get(p)!.push(sec);
+      });
+
+      priceGroups.forEach((secs, price) => {
+        const sample = secs[0];
+        let name = sample.tierName;
+        if (!name) {
+          name = `${sample.name || 'Standard'} Tier`;
+        }
+        baseTiers.push({
+          id: sample.tierId || `tier-fallback-${price}`,
+          name: name,
+          color: sample.tierColor || sample.color,
+          basePrice: price,
+          description: `Seating covering the ${name} areas.`,
+        });
+      });
+    }
+
+    baseTiers.sort((a, b) => b.basePrice - a.basePrice);
+    return baseTiers;
+  }, [event]);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Toolbar */}
-      <div className="flex items-center gap-4 px-6 py-3 border-b border-white/[0.06] glass">
+    <div className="flex flex-col h-full bg-primary overflow-y-auto">
+      {/* TOOLBAR */}
+      <div className="flex items-center gap-4 px-6 py-3 border-b border-subtle glass sticky top-0 z-10 flex-shrink-0">
         {view === 'seats' && (
           <button
             onClick={handleBackToMap}
-            className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors"
+            className="flex items-center gap-1.5 text-sm text-secondary hover:text-primary transition-colors"
           >
             <ArrowLeft size={15} />
             All Sections
@@ -316,11 +366,11 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
         )}
         {view === 'seats' && selectedSection && (
           <>
-            <span className="text-slate-600">/</span>
+            <span className="text-muted">/</span>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: selectedSection.color }} />
-              <span className="text-sm font-medium text-white">{selectedSection.name}</span>
-              <span className="text-xs text-slate-500 flex items-center gap-1">
+              <span className="text-sm font-medium text-primary">{selectedSection.name}</span>
+              <span className="text-xs text-muted flex items-center gap-1">
                 <Users size={10} />
                 {selectedSection.availableSeats} available
               </span>
@@ -328,91 +378,158 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
           </>
         )}
         {view === 'map' && (
-          <span className="text-sm text-slate-400">
+          <span className="text-sm text-secondary">
             Click a section to choose your seats
           </span>
         )}
       </div>
 
-      {/* Main layout */}
-      <div className="flex-1 flex gap-0 overflow-hidden relative">
-        {/* Left: Map Canvas (always mounted for zoom test verification) */}
-        <div className="flex-1 overflow-hidden relative">
-          <div className="w-full h-full p-4">
-            <VenueMapCanvas
-              event={event}
-              onSectionSelect={handleSectionSelect}
-              selectedSectionId={selectedSection?.id}
-            />
+      {/* HERO SECTION */}
+      <div className="w-full bg-secondary border-b border-subtle flex-shrink-0" style={{ height: '60vh', minHeight: '400px' }}>
+        {view === 'map' ? (
+          <div className="w-full h-full flex items-center justify-center max-w-7xl mx-auto p-6 gap-8">
+            {/* Left: Poster */}
+            <div className="w-[35%] h-full rounded-2xl overflow-hidden shadow-2xl relative border border-subtle bg-card">
+              <img src="/img/Home%20sweet%20Loan%20Poster.jpeg" alt="Event Poster" className="object-cover w-full h-full opacity-90" />
+            </div>
+            {/* Right: Venue Map */}
+            <div className="w-[65%] h-full glass rounded-2xl border border-subtle p-2 shadow-xl relative overflow-hidden">
+              <VenueMapCanvas
+                event={event}
+                onSectionSelect={handleSectionSelect}
+                selectedSectionId={selectedSection?.id}
+              />
+            </div>
           </div>
-
-          {/* Modal Dialog for SeatGridPicker */}
-          {view === 'seats' && selectedSection && (
-            <div
-              data-testid="seat-grid-overlay"
-              className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 seat-grid-picker"
-            >
-              <div
-                className="w-full max-w-5xl bg-[#090d16] border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-              >
+        ) : (
+          <div className="w-full h-full max-w-7xl mx-auto p-6">
+            {/* Seat Grid Picker filling the Hero Section */}
+            <div className="w-full h-full glass rounded-2xl border border-subtle shadow-xl relative flex flex-col bg-card overflow-hidden">
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-white/[0.06] flex items-center justify-between bg-white/[0.02]">
+                <div className="px-6 py-4 border-b border-subtle flex items-center justify-between bg-secondary">
                   <div className="flex items-center gap-2">
-                    <div className="w-3.5 h-3.5 rounded-sm" style={{ background: selectedSection.color }} />
-                    <span className="font-semibold text-white">{selectedSection.name} Seats</span>
+                    <div className="w-3.5 h-3.5 rounded-sm" style={{ background: selectedSection?.color }} />
+                    <span className="font-semibold text-primary">{selectedSection?.name} Seats</span>
                   </div>
                   <button
                     onClick={handleBackToMap}
-                    className="text-xs font-semibold px-3 py-1.5 bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 rounded-lg transition-colors"
+                    className="text-xs font-semibold px-3 py-1.5 bg-secondary hover:bg-accent hover:text-white text-secondary rounded-lg transition-colors"
                   >
                     Back to Map
                   </button>
                 </div>
 
                 {lockError && (
-                  <div className="bg-red-500/10 border-b border-red-500/20 px-6 py-2.5 flex items-center justify-between text-xs text-red-400 font-medium">
+                  <div className="bg-accent/10 border-b border-accent/20 px-6 py-2.5 flex items-center justify-between text-xs text-accent font-medium">
                     <span>{lockError}</span>
-                    <button onClick={() => setLockError(null)} className="p-1 hover:text-red-300 transition-colors">
+                    <button onClick={() => setLockError(null)} className="p-1 hover:text-accent-hover transition-colors">
                       <X size={12} />
                     </button>
                   </div>
                 )}
 
-                {/* Modal Body: Seat Grid on Left, Booking Sidebar on Right */}
-                <div className="flex flex-1 overflow-hidden">
-                  <div className="flex-1 flex flex-col items-center justify-center overflow-hidden p-6">
-                    {loadingSeats ? (
-                      <div className="flex items-center gap-3 text-slate-400">
-                        <Loader2 size={24} className="animate-spin" />
-                        <span className="text-sm">Loading seats…</span>
-                      </div>
-                    ) : (
-                      <SeatGridPicker
-                        section={selectedSection}
-                        seats={seats}
-                        selectedIds={selectedSeatIds}
-                        onToggleSeat={handleToggleSeat}
-                        disabledSeatKeys={selectedSection.geometry?.disabledSeats || []}
-                        sessionId={sessionId}
-                      />
-                    )}
-                  </div>
-
-                  {/* Right: booking cart */}
-                  <div className="w-80 flex-shrink-0 p-4 border-l border-white/[0.06] bg-[#070a12] flex flex-col">
-                    <BookingCartSidebar
+                {/* Grid */}
+                <div className="flex-1 flex flex-col items-center justify-center overflow-hidden p-6 relative">
+                  {loadingSeats ? (
+                    <div className="flex items-center gap-3 text-secondary">
+                      <Loader2 size={24} className="animate-spin" />
+                      <span className="text-sm">Loading seats…</span>
+                    </div>
+                  ) : selectedSection ? (
+                    <SeatGridPicker
                       section={selectedSection}
-                      eventId={event.id}
-                      selectedSeats={selectedSeatObjects}
-                      onClearSeat={handleClearSeat}
-                      onBookingComplete={handleBookingComplete}
-                      userSessionId={sessionId}
+                      seats={seats}
+                      selectedIds={selectedSeatIds}
+                      onToggleSeat={handleToggleSeat}
+                      disabledSeatKeys={selectedSection.geometry?.disabledSeats || []}
+                      sessionId={sessionId}
                     />
-                  </div>
+                  ) : null}
                 </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* BOTTOM SECTION */}
+      <div className="flex-1 w-full max-w-7xl mx-auto p-6 flex gap-8">
+        {/* Left: Details */}
+        <div className="flex-1 flex flex-col gap-8 text-primary pr-4">
+          <div className="glass p-6 rounded-2xl border border-subtle">
+            <h2 className="text-lg font-bold mb-3 text-primary">Description</h2>
+            <p className="text-sm text-secondary leading-relaxed">
+              Experience an unforgettable journey with <strong>{event.title}</strong> at {event.venueName}. 
+              Prepare yourself for a spectacular show packed with mesmerizing visuals and stunning performances!
+              This event is highly anticipated, so make sure to secure your seats quickly.
+            </p>
+          </div>
+          
+          {activeTiers && activeTiers.length > 0 && (
+            <div className="glass p-6 rounded-2xl border border-subtle">
+              <h2 className="text-lg font-bold mb-3 text-primary">Pricing Tiers</h2>
+              <div className="flex flex-col gap-4">
+                {activeTiers.map((tier: any) => {
+                  const matchingSections = event.sections.filter(sec => {
+                    if (sec.shapeType === 'STAGE') return false;
+                    if (event.layout?.pricingTiers && event.layout.pricingTiers.length > 0) {
+                      if (tier.id === 'tier-economy-fallback') {
+                         return !event.layout.pricingTiers.find((t: any) => t.id === sec.tierId || t.name === sec.tierName);
+                      }
+                      return sec.tierId === tier.id || sec.tierName === tier.name;
+                    } else {
+                      return sec.price === tier.basePrice;
+                    }
+                  });
+                  const sectionNames = Array.from(new Set(matchingSections.map(s => s.name))).join(', ');
+                  
+                  return (
+                  <div key={tier.id} className="flex gap-4 items-start border-b border-subtle pb-4 last:border-0 last:pb-0">
+                    <div className="w-4 h-4 rounded mt-1 flex-shrink-0" style={{ background: tier.color }} />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-semibold text-primary">{tier.name}</span>
+                        <span className="font-mono font-medium text-accent">Rp {tier.basePrice.toLocaleString('id-ID')}</span>
+                      </div>
+                      <p className="text-sm text-secondary mb-1">{tier.description || 'No description available.'}</p>
+                      {sectionNames && (
+                        <p className="text-xs text-muted mb-2 font-medium">Includes: {sectionNames}</p>
+                      )}
+                      {tier.salesEndDate && (
+                        <div className="text-xs font-medium px-2 py-1 bg-secondary inline-block rounded border border-subtle">
+                          Sales end: {new Date(tier.salesEndDate).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  );
+                })}
               </div>
             </div>
           )}
+          <div className="glass p-6 rounded-2xl border border-subtle">
+            <h2 className="text-lg font-bold mb-3 text-primary">Terms & Conditions</h2>
+            <ul className="text-sm text-secondary list-disc pl-5 space-y-2">
+              <li>Tickets are strictly non-refundable and non-transferable.</li>
+              <li>Please arrive at least 30 minutes before the event starts.</li>
+              <li>Outside food and drinks are prohibited inside the venue.</li>
+              <li>Flash photography is strictly prohibited.</li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Right: Booking Cart Sidebar */}
+        <div className="w-[380px] flex-shrink-0">
+          <div className="sticky top-20 border border-subtle bg-secondary rounded-2xl shadow-xl flex flex-col overflow-hidden" style={{ minHeight: '400px' }}>
+            <BookingCartSidebar
+              sections={event.sections}
+              pricingTiers={event.layout?.pricingTiers}
+              eventId={event.id}
+              selectedSeats={selectedSeatObjects}
+              onClearSeat={handleClearSeat}
+              onBookingComplete={handleBookingComplete}
+              userSessionId={sessionId}
+            />
+          </div>
         </div>
       </div>
     </div>

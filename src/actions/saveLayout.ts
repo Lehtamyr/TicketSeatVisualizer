@@ -1,5 +1,6 @@
 'use server';
 
+import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { SaveLayoutInput } from '@/types/venue';
 import { generateSeatGrid } from '@/lib/seatGenerator';
@@ -33,6 +34,7 @@ export async function saveLayoutAction(input: SaveLayoutInput): Promise<{ succes
         if (input.layoutId) {
           // Update existing layout — delete old sections (cascade deletes seats)
           await tx.section.deleteMany({ where: { layoutId: input.layoutId } });
+          await tx.pricingTier.deleteMany({ where: { layoutId: input.layoutId } });
           layout = await tx.venueLayout.update({
             where: { id: input.layoutId },
             data: {
@@ -52,6 +54,28 @@ export async function saveLayoutAction(input: SaveLayoutInput): Promise<{ succes
           });
         }
 
+        // Re-create pricing tiers
+        const tierIdMap: Record<string, string> = {};
+        if (input.pricingTiers && input.pricingTiers.length > 0) {
+          await tx.pricingTier.createMany({
+            data: input.pricingTiers.map(t => {
+              const newId = crypto.randomUUID();
+              if (t.id) {
+                tierIdMap[t.id] = newId;
+              }
+              return {
+                id: newId,
+                layoutId: layout.id,
+                name: t.name,
+                color: t.color,
+                basePrice: t.basePrice,
+                description: t.description,
+                salesEndDate: t.salesEndDate ? new Date(t.salesEndDate) : null,
+              };
+            })
+          });
+        }
+
         // Re-create sections and their seats
         for (const sec of processedSections) {
           const isStage = sec.shapeType === 'STAGE';
@@ -66,6 +90,7 @@ export async function saveLayoutAction(input: SaveLayoutInput): Promise<{ succes
               code: sec.code,
               shapeType: dbShapeType as any,
               geometry: geomToSave,
+              pricingTierId: isStage ? null : (sec.tierId ? (tierIdMap[sec.tierId] || sec.tierId) : null),
               price: isStage ? 0 : sec.price,
               color: sec.color,
               rowCount: isStage ? 0 : sec.rowCount,

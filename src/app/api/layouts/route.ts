@@ -24,6 +24,7 @@ export async function GET(request: Request) {
       const layout = await prisma.venueLayout.findUnique({
         where: { id: layoutId },
         include: {
+          pricingTiers: true,
           sections: {
             include: {
               seats: true,
@@ -49,6 +50,7 @@ export async function GET(request: Request) {
 
     const layouts = await prisma.venueLayout.findMany({
       include: {
+        pricingTiers: true,
         sections: {
           include: {
             seats: true,

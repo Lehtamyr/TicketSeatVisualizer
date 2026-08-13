@@ -14,6 +14,7 @@ export async function getEvents(): Promise<EventDTO[]> {
   const events = await prisma.event.findMany({
     orderBy: { startTime: 'asc' },
     include: {
+      layout: { include: { pricingTiers: true } },
       sections: {
         include: {
           pricingTier: true,
@@ -36,6 +37,7 @@ export async function getEvents(): Promise<EventDTO[]> {
     endTime: e.endTime?.toISOString() ?? null,
     viewBoxWidth: e.viewBoxWidth,
     viewBoxHeight: e.viewBoxHeight,
+    layout: e.layout,
     sections: e.sections.map((s) => {
       const geom = parseGeometry(s.geometry);
       const isStage = s.shapeType === 'STAGE' || geom?.shapeType === 'STAGE';
@@ -60,6 +62,7 @@ export async function getEventById(eventId: string): Promise<EventDTO | null> {
   const event = await prisma.event.findUnique({
     where: { id: eventId },
     include: {
+      layout: { include: { pricingTiers: true } },
       sections: {
         include: {
           pricingTier: true,
@@ -84,6 +87,7 @@ export async function getEventById(eventId: string): Promise<EventDTO | null> {
     endTime: event.endTime?.toISOString() ?? null,
     viewBoxWidth: event.viewBoxWidth,
     viewBoxHeight: event.viewBoxHeight,
+    layout: event.layout,
     sections: event.sections.map((s) => {
       const geom = parseGeometry(s.geometry);
       const isStage = s.shapeType === 'STAGE' || geom?.shapeType === 'STAGE';

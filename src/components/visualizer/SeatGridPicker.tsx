@@ -135,8 +135,8 @@ export function SeatGridPicker({
   return (
     <div className="w-full h-full flex flex-col gap-3 seat-picker-grid-container overflow-hidden">
       {/* Zoom & Navigation Toolbar Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-white/[0.03] border border-white/[0.06] rounded-xl text-xs select-none">
-        <span className="text-slate-400 flex items-center gap-1.5 text-[11px]">
+      <div className="flex items-center justify-between px-4 py-2 bg-secondary border border-subtle rounded-xl text-xs select-none">
+        <span className="text-secondary flex items-center gap-1.5 text-[11px]">
           <span>↔️</span>
           <span>Scroll or pan grid to view all seats without crowding</span>
         </span>
@@ -144,16 +144,16 @@ export function SeatGridPicker({
           <button
             type="button"
             onClick={() => setZoomScale((z) => Math.max(0.6, z - 0.15))}
-            className="w-7 h-7 bg-white/5 hover:bg-white/10 rounded-lg text-slate-200 flex items-center justify-center font-bold text-sm transition-colors"
+            className="w-7 h-7 bg-secondary hover:bg-accent hover:text-white rounded-lg text-secondary flex items-center justify-center font-bold text-sm transition-colors"
             title="Zoom Out (-)"
           >
             -
           </button>
-          <span className="text-slate-300 font-mono text-[11px] w-10 text-center font-semibold">{Math.round(zoomScale * 100)}%</span>
+          <span className="text-secondary font-mono text-[11px] w-10 text-center font-semibold">{Math.round(zoomScale * 100)}%</span>
           <button
             type="button"
             onClick={() => setZoomScale((z) => Math.min(2.5, z + 0.15))}
-            className="w-7 h-7 bg-white/5 hover:bg-white/10 rounded-lg text-slate-200 flex items-center justify-center font-bold text-sm transition-colors"
+            className="w-7 h-7 bg-secondary hover:bg-accent hover:text-white rounded-lg text-secondary flex items-center justify-center font-bold text-sm transition-colors"
             title="Zoom In (+)"
           >
             +
@@ -161,7 +161,7 @@ export function SeatGridPicker({
           <button
             type="button"
             onClick={() => setZoomScale(1.0)}
-            className="px-2 py-1 bg-white/5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white text-[10px] font-semibold transition-colors"
+            className="px-2 py-1 bg-secondary hover:bg-accent hover:text-white rounded-lg text-secondary hover:text-primary text-[10px] font-semibold transition-colors"
           >
             Reset
           </button>
@@ -170,8 +170,8 @@ export function SeatGridPicker({
 
       {/* Standardized Scrollable Seat Viewport Container with 100% working Overflow */}
       <div
-        className="w-full flex-1 overflow-x-auto overflow-y-auto rounded-2xl border border-white/[0.08] p-4 shadow-2xl relative select-none custom-scrollbar"
-        style={{ background: 'radial-gradient(ellipse at center, #0c1322 0%, #070a12 100%)' }}
+        className="w-full flex-1 overflow-x-auto overflow-y-auto rounded-2xl border border-default p-4 shadow-2xl relative select-none custom-scrollbar"
+        style={{ background: "var(--bg-primary)" }}
       >
         <div className="min-w-max min-h-max flex flex-col items-center justify-start p-8">
           <svg
@@ -200,7 +200,7 @@ export function SeatGridPicker({
               x={colIndex * 46}
               y={scaledMinY - SEAT_R - 8}
               textAnchor="middle"
-              fill="rgba(255,255,255,0.35)"
+              fill="var(--canvas-text)"
               fontSize="9.5"
               fontWeight="600"
               fontFamily="JetBrains Mono, monospace"
@@ -221,7 +221,7 @@ export function SeatGridPicker({
                   x={minX - SEAT_R - (adminMode ? 32 : 12)}
                   y={y + 4.5}
                   textAnchor="end"
-                  fill="rgba(255,255,255,0.4)"
+                  fill="var(--canvas-text)"
                   fontSize="11.5"
                   fontWeight="600"
                   fontFamily="JetBrains Mono, monospace"
@@ -249,7 +249,7 @@ export function SeatGridPicker({
                       x={minX - SEAT_R - 16}
                       y={y + 3}
                       textAnchor="middle"
-                      fill="#ef4444"
+                      fill="var(--seat-reserved)"
                       fontSize="7"
                       fontWeight="bold"
                     >
@@ -281,14 +281,14 @@ export function SeatGridPicker({
             else fillClass = 'seat-reserved';
 
             const strokeColor = isSelected
-              ? '#818cf8'
+              ? 'var(--accent-primary)'
               : isDisabledInAdmin
               ? 'rgba(239, 68, 68, 0.85)'
               : isAvailable
-              ? 'rgba(255,255,255,0.6)'
+              ? 'rgba(0,0,0,0.15)'
               : isHeld
               ? '#f59e0b'
-              : 'rgba(255,255,255,0.2)';
+              : 'rgba(0,0,0,0.1)';
 
             if (isDisabledInAdmin && !adminMode) return null; // ponytail: completely hide admin-disabled seats from users
 
@@ -302,7 +302,7 @@ export function SeatGridPicker({
                   cy={seat.renderY}
                   r={SEAT_R + 1.5}
                   fill="none"
-                  stroke="#07090f"
+                  stroke="var(--bg-primary)"
                   strokeWidth="2.5"
                   style={{ pointerEvents: 'none' }}
                 />
@@ -344,7 +344,7 @@ export function SeatGridPicker({
               x={seat.renderX}
               y={seat.renderY + 3.5}
               textAnchor="middle"
-              fill="#ffffff"
+              fill="var(--text-primary)"
               fontSize="9.5"
               fontWeight="bold"
               fontFamily="Inter, sans-serif"
@@ -358,13 +358,13 @@ export function SeatGridPicker({
       </div>
 
       {/* Row legend */}
-      <div className="flex items-center justify-center gap-4 py-1 text-xs text-slate-400 flex-wrap">
+      <div className="flex items-center justify-center gap-4 py-1 text-xs text-secondary flex-wrap">
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full border border-white/40" style={{ background: 'var(--seat-available)' }} /> Available</span>
-        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full border border-amber-400/40" style={{ background: 'var(--seat-held)' }} /> Held</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full border border-accent/40" style={{ background: 'var(--seat-held)' }} /> Held</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full border border-white/20" style={{ background: 'var(--seat-reserved)' }} /> Reserved</span>
-        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full border border-indigo-400" style={{ background: 'var(--seat-selected)' }} /> Selected</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full border border-accent" style={{ background: 'var(--seat-selected)' }} /> Selected</span>
         {adminMode && (
-          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full border border-dashed border-red-500 bg-red-500/20" /> Disabled Seat</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full border border-dashed border-accent bg-accent/20" /> Disabled Seat</span>
         )}
       </div>
     </div>

@@ -150,24 +150,24 @@ export default function AdminDashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#07090f] text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-primary text-primary flex flex-col">
       {/* Top Navbar */}
-      <header className="glass border-b border-white/[0.06] px-6 py-4 flex items-center justify-between sticky top-0 z-40">
+      <header className="glass border-b border-subtle px-6 py-4 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-4">
-          <Link href="/" className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-sm">
+          <Link href="/" className="flex items-center gap-1.5 text-secondary hover:text-primary transition-colors text-sm">
             <ArrowLeft size={14} />
             Back to Home
           </Link>
-          <div className="h-4 w-px bg-white/10" />
+          <div className="h-4 w-px hover:bg-accent hover:text-white" />
           <div className="flex items-center gap-2">
-            <LayoutGrid size={16} className="text-indigo-400" />
-            <h1 className="text-sm font-semibold text-white">Admin Control Dashboard</h1>
+            <LayoutGrid size={16} className="text-accent" />
+            <h1 className="text-sm font-semibold text-primary">Admin Control Dashboard</h1>
           </div>
         </div>
 
         <Link
           href="/admin/layout-builder"
-          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition-all"
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-accent hover:bg-accent-hover text-primary font-medium transition-all"
         >
           <Plus size={13} />
           Create New Layout
@@ -180,20 +180,20 @@ export default function AdminDashboardPage() {
         {/* Left Side: Saved Layouts (7 cols) */}
         <section className="lg:col-span-7 flex flex-col gap-6">
           <div>
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <Layers size={18} className="text-indigo-400" />
+            <h2 className="text-xl font-bold text-primary flex items-center gap-2">
+              <Layers size={18} className="text-accent" />
               Venue Seat Layouts
             </h2>
-            <p className="text-xs text-slate-400 mt-1">Select and manage modular seating layouts or spawn ticket sale events.</p>
+            <p className="text-xs text-secondary mt-1">Select and manage modular seating layouts or spawn ticket sale events.</p>
           </div>
 
           {loadingLayouts ? (
             <div className="glass rounded-2xl p-12 flex items-center justify-center">
-              <Loader2 className="animate-spin text-indigo-400 mr-2" size={20} />
-              <span className="text-sm text-slate-400">Loading layouts…</span>
+              <Loader2 className="animate-spin text-accent mr-2" size={20} />
+              <span className="text-sm text-secondary">Loading layouts…</span>
             </div>
           ) : layouts.length === 0 ? (
-            <div className="glass rounded-2xl p-12 text-center text-slate-500 border border-dashed border-white/10">
+            <div className="glass rounded-2xl p-12 text-center text-muted border border-dashed border-subtle">
               <Layers size={36} className="mx-auto mb-3 opacity-20" />
               <p className="text-sm">No layouts built yet</p>
               <p className="text-xs mt-1">Click &quot;Create New Layout&quot; above to design your first modular seat layout.</p>
@@ -201,45 +201,45 @@ export default function AdminDashboardPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {layouts.map((l) => (
-                <div key={l.id} className="glass rounded-2xl p-5 flex flex-col justify-between border border-white/[0.04] hover:border-indigo-500/20 transition-all duration-300 relative group/card">
+                <div key={l.id} className="glass rounded-2xl p-5 flex flex-col justify-between border border-subtle hover:border-accent/20 transition-all duration-300 relative group/card">
                   <div>
                     <div className="flex items-start justify-between gap-2 mb-1">
-                      <h3 className="text-sm font-semibold text-white truncate flex-1">{l.name}</h3>
+                      <h3 className="text-sm font-semibold text-primary truncate flex-1">{l.name}</h3>
                       <button
                         onClick={() => handleDeleteLayout(l.id)}
-                        className="text-slate-500 hover:text-red-400 p-1 rounded transition-colors opacity-0 group-hover/card:opacity-100 focus:opacity-100"
+                        className="text-muted hover:text-accent-hover p-1 rounded transition-colors opacity-0 group-hover/card:opacity-100 focus:opacity-100"
                         title="Delete Layout"
                       >
                         <Trash2 size={13} />
                       </button>
                     </div>
-                    <p className="text-[10px] text-slate-500">
+                    <p className="text-[10px] text-muted">
                       Updated {new Date(l.updatedAt).toLocaleDateString()}
                     </p>
 
                     <div className="mt-4 flex gap-4 text-xs">
                       <div>
-                        <span className="text-slate-500 block text-[10px] uppercase">Sections</span>
-                        <span className="font-semibold text-slate-200">{l.sectionCount}</span>
+                        <span className="text-muted block text-[10px] uppercase">Sections</span>
+                        <span className="font-semibold text-secondary">{l.sectionCount}</span>
                       </div>
                       <div>
-                        <span className="text-slate-500 block text-[10px] uppercase">Total Seats</span>
-                        <span className="font-semibold text-slate-200">{l.totalSeats}</span>
+                        <span className="text-muted block text-[10px] uppercase">Total Seats</span>
+                        <span className="font-semibold text-secondary">{l.totalSeats}</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-6 pt-4 border-t border-white/[0.04] flex items-center justify-between gap-2">
+                  <div className="mt-6 pt-4 border-t border-subtle flex items-center justify-between gap-2">
                     <Link
                       href={`/admin/layout-builder?layoutId=${l.id}`}
-                      className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-semibold bg-white/5 hover:bg-white/10 text-slate-300 transition-all"
+                      className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-semibold bg-secondary hover:bg-accent hover:text-white text-secondary transition-all"
                     >
                       <Edit3 size={11} />
                       Edit Layout
                     </Link>
                     <button
                       onClick={() => handleOpenCreateEvent(l)}
-                      className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-semibold bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/20 text-indigo-300 transition-all"
+                      className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-semibold glass hover:bg-accent hover:text-white border border-accent/20 text-accent transition-all"
                     >
                       <Play size={10} />
                       Create Event
@@ -254,20 +254,20 @@ export default function AdminDashboardPage() {
         {/* Right Side: Active Events (5 cols) */}
         <section className="lg:col-span-5 flex flex-col gap-6">
           <div>
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <Calendar size={18} className="text-indigo-400" />
+            <h2 className="text-xl font-bold text-primary flex items-center gap-2">
+              <Calendar size={18} className="text-accent" />
               Active Events
             </h2>
-            <p className="text-xs text-slate-400 mt-1">Live ticket sale visualizers created from saved layout templates.</p>
+            <p className="text-xs text-secondary mt-1">Live ticket sale visualizers created from saved layout templates.</p>
           </div>
 
           {loadingEvents ? (
             <div className="glass rounded-2xl p-12 flex items-center justify-center">
-              <Loader2 className="animate-spin text-indigo-400 mr-2" size={20} />
-              <span className="text-sm text-slate-400">Loading events…</span>
+              <Loader2 className="animate-spin text-accent mr-2" size={20} />
+              <span className="text-sm text-secondary">Loading events…</span>
             </div>
           ) : events.length === 0 ? (
-            <div className="glass rounded-2xl p-12 text-center text-slate-500 border border-dashed border-white/10">
+            <div className="glass rounded-2xl p-12 text-center text-muted border border-dashed border-subtle">
               <Calendar size={36} className="mx-auto mb-3 opacity-20" />
               <p className="text-sm">No live events active</p>
               <p className="text-xs mt-1">Use the &quot;Create Event&quot; button next to a layout template to launch one.</p>
@@ -280,25 +280,25 @@ export default function AdminDashboardPage() {
                 const pct = total > 0 ? Math.round((available / total) * 100) : 0;
 
                 return (
-                  <div key={e.id} className="glass rounded-2xl p-4 border border-white/[0.04] flex items-center justify-between gap-4">
+                  <div key={e.id} className="glass rounded-2xl p-4 border border-subtle flex items-center justify-between gap-4">
                     <div className="min-w-0 flex-1">
-                      <h3 className="text-xs font-semibold text-white truncate">{e.title}</h3>
-                      <p className="text-[10px] text-slate-400 mt-0.5 truncate">{e.venueName}</p>
-                      <div className="flex items-center gap-3 mt-3 text-[10px] text-slate-500">
+                      <h3 className="text-xs font-semibold text-primary truncate">{e.title}</h3>
+                      <p className="text-[10px] text-secondary mt-0.5 truncate">{e.venueName}</p>
+                      <div className="flex items-center gap-3 mt-3 text-[10px] text-muted">
                         <span>{new Date(e.startTime).toLocaleDateString()}</span>
-                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500/40" />
+                        <div className="w-1.5 h-1.5 rounded-full bg-accent/40" />
                         <span>{available} / {total} Available</span>
                       </div>
 
                       {/* Progress bar */}
-                      <div className="w-full bg-white/5 rounded-full h-1 mt-2.5 overflow-hidden">
-                        <div className="bg-indigo-500 h-1 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                      <div className="w-full bg-secondary rounded-full h-1 mt-2.5 overflow-hidden">
+                        <div className="bg-accent h-1 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
                       </div>
                     </div>
 
                     <Link
                       href={`/events/${e.id}`}
-                      className="px-3 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all flex items-center justify-center flex-shrink-0"
+                      className="px-3 py-2.5 rounded-xl bg-accent hover:bg-accent-hover text-primary transition-all flex items-center justify-center flex-shrink-0"
                       aria-label="View visualizer"
                     >
                       <Play size={12} fill="currentColor" />
@@ -314,83 +314,83 @@ export default function AdminDashboardPage() {
       {/* Create Event Dialog Modal */}
       {selectedLayout && (
         <div className="fixed inset-0 bg-[#020306]/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="glass max-w-sm w-full rounded-2xl border border-white/10 shadow-2xl p-6 relative animate-zoom-in">
+          <div className="glass max-w-sm w-full rounded-2xl border border-subtle shadow-2xl p-6 relative animate-zoom-in">
             <button
               onClick={() => setSelectedLayout(null)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors"
+              className="absolute top-4 right-4 text-secondary hover:text-primary transition-colors"
             >
               <X size={16} />
             </button>
 
-            <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-1.5">
-              <Play size={13} className="text-indigo-400" />
+            <h3 className="text-sm font-bold text-primary mb-1 flex items-center gap-1.5">
+              <Play size={13} className="text-accent" />
               Create Event From Layout
             </h3>
-            <p className="text-[11px] text-slate-400 mb-6">
-              Launch a live event visualizer using <span className="font-semibold text-slate-200">{selectedLayout.name}</span>.
+            <p className="text-[11px] text-secondary mb-6">
+              Launch a live event visualizer using <span className="font-semibold text-secondary">{selectedLayout.name}</span>.
             </p>
 
             <form onSubmit={handleCreateEvent} className="flex flex-col gap-4">
               <div>
-                <label className="text-[10px] text-slate-400 block mb-1.5">Event Title</label>
+                <label className="text-[10px] text-secondary block mb-1.5">Event Title</label>
                 <input
                   type="text"
                   required
                   value={eventTitle}
                   onChange={(e) => setEventTitle(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-indigo-500/40 transition-all"
+                  className="w-full bg-secondary border border-subtle rounded-xl px-3 py-2 text-xs text-primary outline-none focus:border-accent/40 transition-all"
                   placeholder="Taylor Swift - Eras Tour"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] text-slate-400 block mb-1.5">Venue name</label>
+                <label className="text-[10px] text-secondary block mb-1.5">Venue name</label>
                 <input
                   type="text"
                   required
                   value={venueName}
                   onChange={(e) => setVenueName(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-indigo-500/40 transition-all"
+                  className="w-full bg-secondary border border-subtle rounded-xl px-3 py-2 text-xs text-primary outline-none focus:border-accent/40 transition-all"
                   placeholder="Staples Center Stadium"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] text-slate-400 block mb-1.5">Start Date & Time</label>
+                <label className="text-[10px] text-secondary block mb-1.5">Start Date & Time</label>
                 <input
                   type="datetime-local"
                   required
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-indigo-500/40 transition-all"
+                  className="w-full bg-secondary border border-subtle rounded-xl px-3 py-2 text-xs text-primary outline-none focus:border-accent/40 transition-all"
                 />
               </div>
 
               {createError && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 text-[10px] text-red-400 mt-2">
+                <div className="bg-accent/10 border border-accent/20 rounded-xl px-3 py-2 text-[10px] text-accent mt-2">
                   {createError}
                 </div>
               )}
 
               {createSuccess && (
-                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-2 text-[10px] text-emerald-400 mt-2 flex items-center gap-1">
+                <div className="bg-accent/10 border border-accent/20 rounded-xl px-3 py-2 text-[10px] text-accent mt-2 flex items-center gap-1">
                   <CheckCircle size={10} />
                   Event created successfully!
                 </div>
               )}
 
-              <div className="mt-4 pt-4 border-t border-white/[0.06] flex justify-end gap-2">
+              <div className="mt-4 pt-4 border-t border-subtle flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setSelectedLayout(null)}
-                  className="px-3 py-1.5 rounded-lg text-[10px] font-semibold hover:bg-white/5 text-slate-400 hover:text-slate-200 transition-all"
+                  className="px-3 py-1.5 rounded-lg text-[10px] font-semibold hover:bg-secondary text-secondary hover:text-secondary transition-all"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={creatingEvent || createSuccess}
-                  className="px-4 py-1.5 rounded-lg text-[10px] font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all disabled:opacity-50 flex items-center gap-1"
+                  className="px-4 py-1.5 rounded-lg text-[10px] font-semibold bg-accent hover:bg-accent-hover text-primary transition-all disabled:opacity-50 flex items-center gap-1"
                 >
                   {creatingEvent && <Loader2 size={10} className="animate-spin" />}
                   {creatingEvent ? 'Creating…' : 'Create Event'}

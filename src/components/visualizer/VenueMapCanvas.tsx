@@ -72,11 +72,11 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
       const pts = selectedSection.geometry.points?.length >= 3
         ? selectedSection.geometry.points
         : (selectedSection.geometry.x !== undefined ? [
-            { x: selectedSection.geometry.x, y: selectedSection.geometry.y! },
-            { x: selectedSection.geometry.x + selectedSection.geometry.width!, y: selectedSection.geometry.y! },
-            { x: selectedSection.geometry.x + selectedSection.geometry.width!, y: selectedSection.geometry.y! + selectedSection.geometry.height! },
-            { x: selectedSection.geometry.x, y: selectedSection.geometry.y! + selectedSection.geometry.height! },
-          ] : []);
+          { x: selectedSection.geometry.x, y: selectedSection.geometry.y! },
+          { x: selectedSection.geometry.x + selectedSection.geometry.width!, y: selectedSection.geometry.y! },
+          { x: selectedSection.geometry.x + selectedSection.geometry.width!, y: selectedSection.geometry.y! + selectedSection.geometry.height! },
+          { x: selectedSection.geometry.x, y: selectedSection.geometry.y! + selectedSection.geometry.height! },
+        ] : []);
 
       if (pts.length >= 3) {
         const bbox = calculateBoundingBox(pts);
@@ -97,12 +97,12 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
         viewBox={currentViewBox}
         data-testid="venue-svg-map"
         className="w-full h-full venue-map"
-        style={{ background: 'radial-gradient(ellipse at center, #0f1929 0%, #070a12 100%)', transition: 'viewBox 0.4s ease-in-out' }}
+        style={{ background: 'var(--bg-primary)', transition: 'viewBox 0.4s ease-in-out' }}
         onMouseMove={handleMouseMove}
       >
         <defs>
           <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="var(--border-subtle)" strokeWidth="0.5" />
           </pattern>
           <filter id="glow-filter">
             <feGaussianBlur stdDeviation="3" result="coloredBlur" />
@@ -119,11 +119,11 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
           const pts = section.geometry.points?.length >= 3
             ? section.geometry.points
             : (section.geometry.x !== undefined ? [
-                { x: section.geometry.x, y: section.geometry.y! },
-                { x: section.geometry.x + section.geometry.width!, y: section.geometry.y! },
-                { x: section.geometry.x + section.geometry.width!, y: section.geometry.y! + section.geometry.height! },
-                { x: section.geometry.x, y: section.geometry.y! + section.geometry.height! },
-              ] : []);
+              { x: section.geometry.x, y: section.geometry.y! },
+              { x: section.geometry.x + section.geometry.width!, y: section.geometry.y! },
+              { x: section.geometry.x + section.geometry.width!, y: section.geometry.y! + section.geometry.height! },
+              { x: section.geometry.x, y: section.geometry.y! + section.geometry.height! },
+            ] : []);
 
           if (pts.length < 3) return null;
 
@@ -145,9 +145,9 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
                   d={path}
                   data-testid={`section-shape-${section.id}`}
                   data-shape="STAGE"
-                  fill="#312e81"
+                  fill="var(--bg-secondary)"
                   fillOpacity="0.85"
-                  stroke="#818cf8"
+                  stroke="var(--border-accent)"
                   strokeWidth="2.5"
                   filter="url(#glow-filter)"
                 />
@@ -155,9 +155,9 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
                   x={centroid.x}
                   y={centroid.y + 4}
                   textAnchor="middle"
-                  fill="#ffffff"
-                  fontSize={Math.max(10, Math.min(bbox.width, bbox.height) * 0.18)}
-                  fontWeight="800"
+                  fill="var(--text-primary)"
+                  fontSize={Math.max(11, Math.min(bbox.width, bbox.height) * 0.20)}
+                  fontWeight="700"
                   letterSpacing="2"
                   fontFamily="Inter, sans-serif"
                   style={{ pointerEvents: 'none', userSelect: 'none' }}
@@ -183,8 +183,8 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
                 x={centroid.x}
                 y={centroid.y - Math.min(bbox.width, bbox.height) * 0.12}
                 textAnchor="middle"
-                fill="#ffffff"
-                fontSize={Math.max(9, Math.min(bbox.width, bbox.height) * 0.08)}
+                fill="var(--text-primary)"
+                fontSize={Math.max(10, Math.min(bbox.width, bbox.height) * 0.10)}
                 fontWeight="700"
                 fontFamily="Inter, sans-serif"
                 style={{ pointerEvents: 'none', userSelect: 'none' }}
@@ -196,12 +196,12 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
                 x={centroid.x}
                 y={centroid.y + Math.min(bbox.width, bbox.height) * 0.15}
                 textAnchor="middle"
-                fill="rgba(255,255,255,0.65)"
-                fontSize={Math.max(7, Math.min(bbox.width, bbox.height) * 0.065)}
+                fill="var(--text-secondary)"
+                fontSize={Math.max(8, Math.min(bbox.width, bbox.height) * 0.075)}
                 fontFamily="Inter, sans-serif"
                 style={{ pointerEvents: 'none', userSelect: 'none' }}
               >
-                ${section.price}
+                Rp {section.price.toLocaleString('id-ID')}
               </text>
 
               <path
@@ -231,8 +231,8 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
           const grade = getAvailabilityGrade(s);
           const tierName = s.tierName || (s as any).pricingTier?.name || (
             s.price >= 120 ? 'VIP Tier' :
-            s.price <= 45 ? 'Economy Tier' :
-            'Standard Tier'
+              s.price <= 45 ? 'Economy Tier' :
+                'Standard Tier'
           );
           return (
             <g
@@ -241,19 +241,19 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
               style={{ pointerEvents: 'none' }}
             >
               <rect x={tx} y={ty} width={tipW} height={tipH} rx="6"
-                fill="rgba(10,13,20,0.95)" stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
-              <text x={tx + 10} y={ty + 20} fill="#f0f4ff" fontSize="11" fontWeight="700" fontFamily="Inter, sans-serif">
+                fill="var(--bg-card)" stroke="var(--border-default)" strokeWidth="1" />
+              <text x={tx + 10} y={ty + 20} fill="var(--text-primary)" fontSize="11" fontWeight="700" fontFamily="Inter, sans-serif">
                 {s.name}
               </text>
               {tierName && (
-                <text x={tx + 10} y={ty + 35} fill={s.tierColor ?? (s as any).pricingTier?.color ?? '#8892a4'} fontSize="9" fontFamily="Inter, sans-serif">
+                <text x={tx + 10} y={ty + 35} fill={s.tierColor ?? (s as any).pricingTier?.color ?? 'var(--text-muted)'} fontSize="9" fontFamily="Inter, sans-serif">
                   {tierName}
                 </text>
               )}
-              <text x={tx + 10} y={ty + 50} fill="#8892a4" fontSize="9" fontFamily="Inter, sans-serif">
-                ${s.price.toFixed(2)} per seat
+              <text x={tx + 10} y={ty + 50} fill="var(--text-secondary)" fontSize="9" fontFamily="Inter, sans-serif">
+                Rp {s.price.toLocaleString('id-ID')} per seat
               </text>
-              <text x={tx + 10} y={ty + 65} fill={grade < 0.2 ? '#ef4444' : '#22d3ee'} fontSize="9" fontFamily="Inter, sans-serif">
+              <text x={tx + 10} y={ty + 65} fill={grade < 0.2 ? 'var(--accent-hover)' : 'var(--text-muted)'} fontSize="9" fontFamily="Inter, sans-serif">
                 {s.availableSeats} available
               </text>
             </g>
@@ -263,16 +263,16 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
 
       <div className="absolute bottom-3 left-3 flex flex-col gap-1.5 glass rounded-lg p-3 text-xs">
         <div className="flex items-center gap-2">
-          <div className="legend-dot" style={{ background: '#22d3ee' }} />
-          <span className="text-slate-300">Available</span>
+          <div className="legend-dot" style={{ background: 'var(--seat-available)' }} />
+          <span className="text-secondary">Available</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="legend-dot" style={{ background: '#f59e0b' }} />
-          <span className="text-slate-300">Limited</span>
+          <div className="legend-dot" style={{ background: 'var(--seat-held)' }} />
+          <span className="text-secondary">Limited</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="legend-dot" style={{ background: '#ef4444' }} />
-          <span className="text-slate-300">Sold Out</span>
+          <div className="legend-dot" style={{ background: 'var(--seat-reserved)' }} />
+          <span className="text-secondary">Sold Out</span>
         </div>
       </div>
     </div>

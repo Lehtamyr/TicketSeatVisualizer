@@ -21,7 +21,7 @@ export default function HomePage() {
 
       <div className="relative z-10 text-center max-w-3xl animate-fade-in">
         {/* Badge */}
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-indigo-500/30 bg-indigo-500/10 text-indigo-300 text-xs font-semibold mb-8 tracking-wide">
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-accent/30 bg-accent/10 text-accent text-xs font-semibold mb-8 tracking-wide">
           <Zap size={10} />
           Dynamic Modular Venue Seating
         </div>
@@ -30,10 +30,10 @@ export default function HomePage() {
         <h1 className="text-5xl md:text-6xl font-bold leading-tight mb-6">
           <span className="gradient-text">Pick Your Perfect</span>
           <br />
-          <span className="text-white">Seat</span>
+          <span className="text-primary">Seat</span>
         </h1>
 
-        <p className="text-slate-400 text-lg mb-12 max-w-xl mx-auto leading-relaxed">
+        <p className="text-secondary text-lg mb-12 max-w-xl mx-auto leading-relaxed">
           Interactive venue maps with custom geometric sections — rectangles, triangles, polygons —
           each with real-time seat availability and instant booking.
         </p>
@@ -42,8 +42,8 @@ export default function HomePage() {
         <div className="flex items-center justify-center gap-4 flex-wrap">
           <Link
             href="/events"
-            className="flex items-center gap-2.5 px-8 py-4 rounded-2xl font-semibold text-white text-sm transition-all duration-200
-              bg-indigo-600 hover:bg-indigo-500 glow-accent"
+            className="flex items-center gap-2.5 px-8 py-4 rounded-2xl font-semibold text-primary text-sm transition-all duration-200
+              bg-accent hover:bg-accent-hover glow-accent"
           >
             <Ticket size={16} />
             Browse Events
@@ -51,8 +51,8 @@ export default function HomePage() {
           </Link>
           <Link
             href="/admin"
-            className="flex items-center gap-2.5 px-8 py-4 rounded-2xl font-semibold text-slate-200 text-sm transition-all duration-200
-              glass hover:border-indigo-500/30"
+            className="flex items-center gap-2.5 px-8 py-4 rounded-2xl font-semibold text-secondary text-sm transition-all duration-200
+              glass hover:bg-accent hover:text-white hover:border-accent"
           >
             <Layers size={16} />
             Admin Dashboard
@@ -79,11 +79,11 @@ export default function HomePage() {
             },
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="glass rounded-2xl p-5">
-              <div className="w-9 h-9 rounded-xl bg-indigo-600/20 flex items-center justify-center mb-4">
-                <Icon size={16} className="text-indigo-400" />
+              <div className="w-9 h-9 rounded-xl bg-accent/20 flex items-center justify-center mb-4">
+                <Icon size={16} className="text-accent" />
               </div>
-              <h3 className="text-sm font-semibold text-white mb-1.5">{title}</h3>
-              <p className="text-xs text-slate-400 leading-relaxed">{desc}</p>
+              <h3 className="text-sm font-semibold text-primary mb-1.5">{title}</h3>
+              <p className="text-xs text-secondary leading-relaxed">{desc}</p>
             </div>
           ))}
         </div>

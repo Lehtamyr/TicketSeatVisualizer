@@ -6,7 +6,8 @@ import { SeatDTO, SectionDTO } from '@/types/venue';
 import { ShoppingCart, Clock, CheckCircle, Ticket, ChevronRight, XCircle } from 'lucide-react';
 
 interface BookingCartSidebarProps {
-  section: SectionDTO;
+  sections: SectionDTO[];
+  pricingTiers?: any[];
   eventId: string;
   selectedSeats: SeatDTO[];
   onClearSeat: (seatId: string) => void;
@@ -17,7 +18,8 @@ interface BookingCartSidebarProps {
 type CartState = 'idle' | 'checking_out' | 'confirmed' | 'error';
 
 export function BookingCartSidebar({
-  section,
+  sections,
+  pricingTiers,
   eventId,
   selectedSeats,
   onClearSeat,
@@ -31,7 +33,7 @@ export function BookingCartSidebar({
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const totalPrice = selectedSeats.reduce(
-    (sum, s) => sum + (typeof s.price === 'number' && !isNaN(s.price) ? s.price : Number(s.price) || section?.price || 0),
+    (sum, s) => sum + (typeof s.price === 'number' && !isNaN(s.price) ? s.price : Number(s.price) || sections.find(sec => sec.id === s.sectionId)?.price || 0),
     0
   );
 
@@ -70,6 +72,21 @@ export function BookingCartSidebar({
 
   const handleCheckout = async () => {
     if (selectedSeats.length === 0) return;
+    const now = new Date();
+    if (pricingTiers) {
+      for (const seat of selectedSeats) {
+        const sec = sections.find(s => s.id === seat.sectionId);
+        if (sec && sec.tierId) {
+          const tier = pricingTiers.find(t => t.id === sec.tierId);
+          if (tier && tier.salesEndDate && new Date(tier.salesEndDate) < now) {
+            setCartState('error');
+            setError(`Sales for ${tier.name} have ended.`);
+            return;
+          }
+        }
+      }
+    }
+
     setCartState('checking_out');
     setError(null);
 
@@ -139,12 +156,12 @@ export function BookingCartSidebar({
   return (
     <div className="glass-elevated rounded-2xl flex flex-col h-full overflow-hidden animate-slide-in">
       {/* Header */}
-      <div className="px-5 py-4 border-b border-white/[0.06]">
+      <div className="px-5 py-4 border-b border-subtle">
         <div className="flex items-center gap-2.5">
-          <ShoppingCart className="text-indigo-400" size={18} />
-          <span className="font-semibold text-sm text-white">Booking Cart</span>
+          <ShoppingCart className="text-accent" size={18} />
+          <span className="font-semibold text-sm text-primary">Booking Cart</span>
           {selectedSeats.length > 0 && (
-            <span className="ml-auto bg-indigo-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+            <span className="ml-auto bg-accent text-primary text-xs font-bold px-2 py-0.5 rounded-full">
               {selectedSeats.length}
             </span>
           )}
@@ -152,20 +169,14 @@ export function BookingCartSidebar({
       </div>
 
       {/* Section info */}
-      <div className="px-5 py-3 border-b border-white/[0.06]">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-sm" style={{ background: section.color }} />
-          <span className="text-sm font-medium text-slate-200">{section.name}</span>
-        </div>
-        {section.tierName && (
-          <span className="text-xs text-slate-400 mt-0.5 block">{section.tierName}</span>
-        )}
+      <div className="px-5 py-3 border-b border-subtle">
+        <span className="text-sm font-medium text-secondary">Your Selections</span>
       </div>
 
       {/* Seat list */}
       <div className="flex-1 overflow-y-auto px-5 py-3">
         {selectedSeats.length === 0 ? (
-          <div className="text-center py-8 text-slate-500 text-sm">
+          <div className="text-center py-8 text-muted text-sm">
             <Ticket size={32} className="mx-auto mb-2 opacity-30" />
             <p>Click seats on the map<br />to add them here</p>
           </div>
@@ -173,17 +184,23 @@ export function BookingCartSidebar({
           <div className="flex flex-col gap-2">
             {selectedSeats.map((seat) => (
               <div key={seat.id}
-                className="flex items-center gap-2 bg-white/[0.04] rounded-lg px-3 py-2">
+                className="flex items-center gap-2 bg-secondary rounded-lg px-3 py-2">
                 <div className="flex-1">
-                  <p className="text-sm text-white font-medium">Row {seat.row} · #{seat.number}</p>
-                  <p className="text-xs text-slate-400">
-                    ${(typeof seat.price === 'number' && !isNaN(seat.price) ? seat.price : Number(seat.price) || section?.price || 0).toFixed(2)}
+                  <p className="text-sm text-primary font-medium">
+                    {(() => {
+                      const sec = sections.find(s => s.id === seat.sectionId);
+                      return sec ? sec.name + ' - ' : '';
+                    })()}
+                    Row {seat.row} · #{seat.number}
+                  </p>
+                  <p className="text-xs text-secondary">
+                    Rp {((typeof seat.price === 'number' && !isNaN(seat.price) ? seat.price : Number(seat.price) || sections.find(sec => sec.id === seat.sectionId)?.price || 0)).toLocaleString("id-ID")}
                   </p>
                 </div>
                 {cartState === 'idle' && (
                   <button
                     onClick={() => onClearSeat(seat.id)}
-                    className="text-slate-500 hover:text-red-400 transition-colors p-1"
+                    className="text-muted hover:text-accent-hover transition-colors p-1"
                     aria-label="Remove seat"
                   >
                     <XCircle size={14} />
@@ -196,10 +213,10 @@ export function BookingCartSidebar({
       </div>
 
       {/* Total */}
-      <div className="px-5 py-3 border-t border-white/[0.06]">
+      <div className="px-5 py-3 border-t border-subtle">
         <div className="flex justify-between items-center">
-          <span className="text-sm text-slate-400">Total</span>
-          <span data-testid="cart-total-price" className="text-lg font-bold text-white">${totalPrice.toFixed(2)}</span>
+          <span className="text-sm text-secondary">Total</span>
+          <span data-testid="cart-total-price" className="text-lg font-bold text-primary">Rp {(totalPrice.toLocaleString("id-ID"))}</span>
         </div>
       </div>
 
@@ -207,21 +224,21 @@ export function BookingCartSidebar({
       {selectedSeats.length > 0 && cartState !== 'confirmed' && (
         <div
           data-testid="countdown-timer"
-          className={`mx-5 mb-3 flex items-center gap-2 rounded-lg px-3 py-2 reservation-timer ${isUrgent ? 'bg-red-500/15 border border-red-500/30' : 'bg-amber-500/10 border border-amber-500/20'
+          className={`mx-5 mb-3 flex items-center gap-2 rounded-lg px-3 py-2 reservation-timer ${isUrgent ? 'bg-secondary border border-accent' : 'bg-secondary border border-subtle'
             }`}
         >
-          <Clock size={14} className={isUrgent ? 'text-red-400' : 'text-amber-400'} />
-          <span className={`text-sm font-mono font-semibold ${isUrgent ? 'text-red-400' : 'text-amber-400'}`}>
+          <Clock size={14} className={isUrgent ? 'text-accent' : 'text-accent'} />
+          <span className={`text-sm font-mono font-semibold ${isUrgent ? 'text-accent' : 'text-accent'}`}>
             {formatTime(timeLeft)}
           </span>
-          <span className="text-xs text-slate-400 ml-1">to checkout</span>
+          <span className="text-xs text-secondary ml-1">to checkout</span>
         </div>
       )}
 
       {/* Error */}
       {error && cartState === 'error' && (
-        <div className="mx-5 mb-3 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
-          <p className="text-xs text-red-400">{error}</p>
+        <div className="mx-5 mb-3 bg-secondary border border-subtle rounded-lg px-3 py-2">
+          <p className="text-xs text-accent">{error}</p>
         </div>
       )}
 
@@ -229,14 +246,14 @@ export function BookingCartSidebar({
       {cartState === 'confirmed' && (
         <div
           data-testid="booking-confirmation-modal"
-          className="mx-5 mb-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2 flex flex-col gap-1 checkout-success"
+          className="mx-5 mb-3 bg-secondary border border-subtle rounded-lg px-3 py-2 flex flex-col gap-1 checkout-success"
         >
           <div className="flex items-center gap-2">
-            <CheckCircle size={14} className="text-emerald-400" />
-            <p className="text-sm text-emerald-400 font-semibold">Booking Successful!</p>
+            <CheckCircle size={14} className="text-accent" />
+            <p className="text-sm text-accent font-semibold">Booking Successful!</p>
           </div>
-          <p className="text-xs text-slate-400">
-            Reservation Confirmed for {section.name}
+          <p className="text-xs text-secondary">
+            Reservation Confirmed
           </p>
         </div>
       )}
@@ -249,14 +266,14 @@ export function BookingCartSidebar({
             onClick={handleCheckout}
             disabled={selectedSeats.length === 0}
             className="w-full py-3 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2
-              bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-30 disabled:cursor-not-allowed
+              bg-accent hover:bg-accent-hover text-primary disabled:opacity-30 disabled:cursor-not-allowed
               animate-pulse-glow"
           >
             Proceed to Checkout
             <ChevronRight size={16} />
           </button>
         ) : cartState === 'checking_out' ? (
-          <button disabled className="w-full py-3 rounded-xl bg-indigo-600/50 text-white text-sm font-semibold animate-pulse">
+          <button disabled className="w-full py-3 rounded-xl bg-secondary text-primary text-sm font-semibold animate-pulse">
             Processing Checkout…
           </button>
         ) : null}

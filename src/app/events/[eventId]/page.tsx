@@ -96,8 +96,8 @@ export default function EventPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-slate-100 gap-3">
-        <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-primary text-primary gap-3">
+        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
         <span className="text-sm font-medium">Loading event visualizer…</span>
       </div>
     );
@@ -105,10 +105,10 @@ export default function EventPage() {
 
   if (error || !event) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-slate-100 p-6 text-center">
-        <p className="text-red-400 font-semibold mb-2">Failed to load event</p>
-        <p className="text-sm text-slate-500 mb-6">{error || 'Event details not available'}</p>
-        <Link href="/events" className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-sm">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-primary text-primary p-6 text-center">
+        <p className="text-accent font-semibold mb-2">Failed to load event</p>
+        <p className="text-sm text-muted mb-6">{error || 'Event details not available'}</p>
+        <Link href="/events" className="flex items-center gap-1.5 text-secondary hover:text-primary transition-colors text-sm">
           ← Back to Events
         </Link>
       </div>
@@ -118,20 +118,20 @@ export default function EventPage() {
   return (
     <div className="flex flex-col animate-fade-in" style={{ height: '100vh' }}>
       {/* Top nav */}
-      <header className="glass border-b border-white/[0.06] px-6 py-3 flex items-center gap-4 flex-shrink-0">
-        <Link href="/" className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-sm">
+      <header className="glass border-b border-subtle px-6 py-3 flex items-center gap-4 flex-shrink-0">
+        <Link href="/" className="flex items-center gap-1.5 text-secondary hover:text-primary transition-colors text-sm">
           ← Home
         </Link>
-        <div className="h-4 w-px bg-white/10" />
-        <Link href="/events" className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-sm">
+        <div className="h-4 w-px hover:bg-accent hover:text-white" />
+        <Link href="/events" className="flex items-center gap-1.5 text-secondary hover:text-primary transition-colors text-sm">
           Events
         </Link>
-        <div className="h-4 w-px bg-white/10" />
+        <div className="h-4 w-px hover:bg-accent hover:text-white" />
         <div>
-          <h1 className="text-sm font-semibold text-white leading-none">{event.title}</h1>
-          <p className="text-xs text-slate-400 mt-0.5">{event.venueName}</p>
+          <h1 className="text-sm font-semibold text-primary leading-none">{event.title}</h1>
+          <p className="text-xs text-secondary mt-0.5">{event.venueName}</p>
         </div>
-        <div className="ml-auto text-xs text-slate-400">
+        <div className="ml-auto text-xs text-secondary">
           {event.startTime ? new Date(event.startTime).toLocaleDateString('en-US', {
             weekday: 'short', month: 'short', day: 'numeric',
             hour: '2-digit', minute: '2-digit',
