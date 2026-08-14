@@ -49,8 +49,9 @@ export async function getEvents(): Promise<EventDTO[]> {
         geometry: geom,
         price: isStage ? 0 : Number(s.price),
         color: s.color,
-        tierName: s.pricingTier?.name,
-        tierColor: s.pricingTier?.color,
+        tierId: isStage ? undefined : (s.pricingTierId ?? s.pricingTier?.id ?? undefined),
+        tierName: isStage ? undefined : s.pricingTier?.name,
+        tierColor: isStage ? undefined : s.pricingTier?.color,
         totalSeats: isStage ? 0 : s._count.seats,
         availableSeats: isStage ? 0 : s.seats.length,
       };
@@ -99,8 +100,9 @@ export async function getEventById(eventId: string): Promise<EventDTO | null> {
         geometry: geom,
         price: isStage ? 0 : Number(s.price),
         color: s.color,
-        tierName: s.pricingTier?.name,
-        tierColor: s.pricingTier?.color,
+        tierId: isStage ? undefined : (s.pricingTierId ?? s.pricingTier?.id ?? undefined),
+        tierName: isStage ? undefined : s.pricingTier?.name,
+        tierColor: isStage ? undefined : s.pricingTier?.color,
         totalSeats: isStage ? 0 : s._count.seats,
         availableSeats: isStage ? 0 : s.seats.length,
       };

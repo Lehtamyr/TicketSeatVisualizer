@@ -32,6 +32,7 @@ export default function AdminDashboardPage() {
   // Event creation form modal state
   const [selectedLayout, setSelectedLayout] = useState<LayoutItem | null>(null);
   const [eventTitle, setEventTitle] = useState('');
+  const [eventDescription, setEventDescription] = useState('');
   const [venueName, setVenueName] = useState('');
   const [startTime, setStartTime] = useState('');
   const [creatingEvent, setCreatingEvent] = useState(false);
@@ -102,6 +103,7 @@ export default function AdminDashboardPage() {
   const handleOpenCreateEvent = (layout: LayoutItem) => {
     setSelectedLayout(layout);
     setEventTitle(`${layout.name} Event`);
+    setEventDescription('');
     setVenueName('Main Arena Stadium');
     // Default to tomorrow same time
     const tomorrow = new Date();
@@ -126,6 +128,7 @@ export default function AdminDashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: eventTitle,
+          description: eventDescription,
           venueName,
           startTime: new Date(startTime).toISOString(),
           layoutId: selectedLayout.id,
@@ -313,86 +316,97 @@ export default function AdminDashboardPage() {
 
       {/* Create Event Dialog Modal */}
       {selectedLayout && (
-        <div className="fixed inset-0 bg-[#020306]/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="glass max-w-sm w-full rounded-2xl border border-subtle shadow-2xl p-6 relative animate-zoom-in">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-subtle shadow-2xl p-6 relative max-w-md w-full animate-zoom-in text-slate-800">
             <button
               onClick={() => setSelectedLayout(null)}
-              className="absolute top-4 right-4 text-secondary hover:text-primary transition-colors"
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 transition-colors"
             >
-              <X size={16} />
+              <X size={18} />
             </button>
 
-            <h3 className="text-sm font-bold text-primary mb-1 flex items-center gap-1.5">
-              <Play size={13} className="text-accent" />
+            <h3 className="text-base font-bold text-slate-900 mb-1 flex items-center gap-2">
+              <Play size={15} className="text-accent" />
               Create Event From Layout
             </h3>
-            <p className="text-[11px] text-secondary mb-6">
-              Launch a live event visualizer using <span className="font-semibold text-secondary">{selectedLayout.name}</span>.
+            <p className="text-xs text-slate-600 mb-6">
+              Launch a live event visualizer using <span className="font-semibold text-slate-900">{selectedLayout.name}</span>.
             </p>
 
             <form onSubmit={handleCreateEvent} className="flex flex-col gap-4">
               <div>
-                <label className="text-[10px] text-secondary block mb-1.5">Event Title</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Event Title</label>
                 <input
                   type="text"
                   required
                   value={eventTitle}
                   onChange={(e) => setEventTitle(e.target.value)}
-                  className="w-full bg-secondary border border-subtle rounded-xl px-3 py-2 text-xs text-primary outline-none focus:border-accent/40 transition-all"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all"
                   placeholder="Taylor Swift - Eras Tour"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] text-secondary block mb-1.5">Venue name</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Description (Optional)</label>
+                <textarea
+                  rows={3}
+                  value={eventDescription}
+                  onChange={(e) => setEventDescription(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all resize-y"
+                  placeholder="Join us for an unforgettable night featuring spectacular performances..."
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Venue Name</label>
                 <input
                   type="text"
                   required
                   value={venueName}
                   onChange={(e) => setVenueName(e.target.value)}
-                  className="w-full bg-secondary border border-subtle rounded-xl px-3 py-2 text-xs text-primary outline-none focus:border-accent/40 transition-all"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all"
                   placeholder="Staples Center Stadium"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] text-secondary block mb-1.5">Start Date & Time</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Start Date & Time</label>
                 <input
                   type="datetime-local"
                   required
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
-                  className="w-full bg-secondary border border-subtle rounded-xl px-3 py-2 text-xs text-primary outline-none focus:border-accent/40 transition-all"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all"
                 />
               </div>
 
               {createError && (
-                <div className="bg-accent/10 border border-accent/20 rounded-xl px-3 py-2 text-[10px] text-accent mt-2">
+                <div className="bg-red-50 border border-red-200 rounded-xl px-3.5 py-2.5 text-xs text-red-600 font-medium mt-1">
                   {createError}
                 </div>
               )}
 
               {createSuccess && (
-                <div className="bg-accent/10 border border-accent/20 rounded-xl px-3 py-2 text-[10px] text-accent mt-2 flex items-center gap-1">
-                  <CheckCircle size={10} />
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3.5 py-2.5 text-xs text-emerald-700 font-medium mt-1 flex items-center gap-1.5">
+                  <CheckCircle size={14} className="text-emerald-600" />
                   Event created successfully!
                 </div>
               )}
 
-              <div className="mt-4 pt-4 border-t border-subtle flex justify-end gap-2">
+              <div className="mt-4 pt-4 border-t border-slate-200 flex justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => setSelectedLayout(null)}
-                  className="px-3 py-1.5 rounded-lg text-[10px] font-semibold hover:bg-secondary text-secondary hover:text-secondary transition-all"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={creatingEvent || createSuccess}
-                  className="px-4 py-1.5 rounded-lg text-[10px] font-semibold bg-accent hover:bg-accent-hover text-primary transition-all disabled:opacity-50 flex items-center gap-1"
+                  className="px-5 py-2 rounded-xl text-xs font-semibold bg-accent hover:bg-accent-hover text-white transition-all disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
                 >
-                  {creatingEvent && <Loader2 size={10} className="animate-spin" />}
+                  {creatingEvent && <Loader2 size={12} className="animate-spin" />}
                   {creatingEvent ? 'Creating…' : 'Create Event'}
                 </button>
               </div>

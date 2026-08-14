@@ -19,6 +19,7 @@ interface AdminSection {
   geometry: SectionGeometry;
   color: string;
   price: number;
+  tierId?: string;
   rowCount: number;
   seatsPerRow: number;
   seats: GeneratedSeat[];
@@ -50,6 +51,7 @@ function SeatEditorWorkspace() {
   const [layoutName, setLayoutName] = useState('Venue Layout');
   const [canvasWidth, setCanvasWidth] = useState(1000);
   const [canvasHeight, setCanvasHeight] = useState(700);
+  const [pricingTiers, setPricingTiers] = useState<any[]>([]);
   const [sections, setSections] = useState<AdminSection[]>([]);
 
   // Selection/zoom view state
@@ -78,6 +80,9 @@ function SeatEditorWorkspace() {
         setLayoutName(data.name || 'Venue Layout');
         setCanvasWidth(data.canvasWidth || 1000);
         setCanvasHeight(data.canvasHeight || 700);
+        if (data.pricingTiers && data.pricingTiers.length > 0) {
+          setPricingTiers(data.pricingTiers);
+        }
 
         const mapped = (data.sections || []).map((s: any) => {
           let geom = s.geometry;
@@ -87,17 +92,19 @@ function SeatEditorWorkspace() {
           if (geom && typeof geom === 'object') {
             geom = { ...geom, clipToBoundary: geom.clipToBoundary === true };
           }
+          const isStage = s.shapeType === 'STAGE' || geom?.shapeType === 'STAGE';
           return {
             id: s.id,
+            tierId: isStage ? undefined : (s.pricingTierId || s.tierId || undefined),
             name: s.name,
             code: s.code,
-            shapeType: s.shapeType,
+            shapeType: isStage ? 'STAGE' : s.shapeType,
             geometry: geom,
             color: s.color || '#3B82F6',
-            price: s.price || 50,
-            rowCount: s.rowCount || 8,
-            seatsPerRow: s.seatsPerRow || 12,
-            seats: s.seats || [],
+            price: isStage ? 0 : (s.price || 50),
+            rowCount: isStage ? 0 : (s.rowCount || 8),
+            seatsPerRow: isStage ? 0 : (s.seatsPerRow || 12),
+            seats: isStage ? [] : (s.seats || []),
             showSeats: s.showSeats !== false,
           };
         });
@@ -202,17 +209,22 @@ function SeatEditorWorkspace() {
           name: layoutName,
           canvasWidth,
           canvasHeight,
-          sections: sections.map((s) => ({
-            name: s.name,
-            code: s.code,
-            shapeType: s.shapeType,
-            geometry: { ...s.geometry, clipToBoundary: false },
-            price: s.price,
-            color: s.color,
-            rowCount: s.rowCount,
-            seatsPerRow: s.seatsPerRow,
-            seats: s.seats.map((seat) => ({ row: seat.row, number: seat.number, x: seat.x, y: seat.y })),
-          })),
+          pricingTiers,
+          sections: sections.map((s) => {
+            const isStage = s.shapeType === 'STAGE';
+            return {
+              name: s.name,
+              code: s.code,
+              shapeType: s.shapeType,
+              geometry: { ...s.geometry, clipToBoundary: false },
+              price: isStage ? 0 : s.price,
+              color: s.color,
+              rowCount: isStage ? 0 : s.rowCount,
+              seatsPerRow: isStage ? 0 : s.seatsPerRow,
+              tierId: isStage ? undefined : (s.tierId || undefined),
+              seats: isStage ? [] : s.seats.map((seat) => ({ row: seat.row, number: seat.number, x: seat.x, y: seat.y })),
+            };
+          }),
         }),
       });
 

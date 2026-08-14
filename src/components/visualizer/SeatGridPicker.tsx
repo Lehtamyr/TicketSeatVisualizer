@@ -67,7 +67,7 @@ export function SeatGridPicker({
       status: s.status || 'AVAILABLE',
       price: s.price ?? (s as any).priceOverride ?? defaultPrice,
     }));
-  }, [section, seats]);
+  }, [section, seats, adminMode, disabledSeatKeys]);
 
   const pad = 35;
 

@@ -15,7 +15,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { title, venueName, startTime, layoutId } = body;
+    const { title, description, venueName, startTime, layoutId } = body;
 
     if (!title || !venueName || !startTime || !layoutId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -42,6 +42,7 @@ export async function POST(request: Request) {
       const event = await tx.event.create({
         data: {
           title,
+          description: description?.trim() || null,
           venueName,
           startTime: new Date(startTime),
           layoutId,
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
             color: section.color,
             rowCount: isStage ? 0 : section.rowCount,
             seatsPerRow: isStage ? 0 : section.seatsPerRow,
-            pricingTierId: section.pricingTierId,
+            pricingTierId: isStage ? null : section.pricingTierId,
           },
         });
 

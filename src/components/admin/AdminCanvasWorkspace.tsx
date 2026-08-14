@@ -71,8 +71,9 @@ const DEFAULT_SECTION: AdminSection = {
     width: 200,
     height: 150,
   },
-  color: '#6366f1',
-  price: 75,
+  color: DEFAULT_TIERS[0].color,
+  price: DEFAULT_TIERS[0].basePrice,
+  tierId: DEFAULT_TIERS[0].id,
   rowCount: 8,
   seatsPerRow: 12,
   seats: [], // Filled on initialize
@@ -118,15 +119,17 @@ export function AdminCanvasWorkspace() {
 
   useEffect(() => {
     if (!layoutIdParam) return;
-    fetch('/api/layouts')
+    fetch(`/api/layouts?layoutId=${layoutIdParam}`, { cache: 'no-store' })
       .then((res) => res.json())
       .then((json) => {
-        const layout = json.data?.find((l: any) => l.id === layoutIdParam);
+        const layout = json.data;
         if (layout) {
           setLayoutId(layout.id);
           setLayoutName(layout.name);
           if (layout.pricingTiers && layout.pricingTiers.length > 0) {
             setPricingTiers(layout.pricingTiers);
+          } else {
+            setPricingTiers(DEFAULT_TIERS);
           }
           if (Array.isArray(layout.sections)) {
             const mapped = layout.sections.map((s: any) => {
@@ -134,7 +137,7 @@ export function AdminCanvasWorkspace() {
               const isStageShape = s.shapeType === 'STAGE' || geomObj?.shapeType === 'STAGE';
               return {
                 id: s.id,
-                tierId: s.pricingTierId || undefined,
+                tierId: isStageShape ? undefined : (s.pricingTierId || s.tierId || undefined),
                 name: s.name,
                 code: s.code,
                 shapeType: isStageShape ? 'STAGE' : s.shapeType,
@@ -258,8 +261,9 @@ export function AdminCanvasWorkspace() {
         code: isStage ? 'STAGE' : `S${count.toString().padStart(2, '0')}`,
         shapeType,
         geometry,
-        color: isStage ? '#4f46e5' : getNextColor(),
-        price: isStage ? 0 : 75,
+        color: isStage ? '#4f46e5' : (pricingTiers.length > 0 ? pricingTiers[0].color : getNextColor()),
+        price: isStage ? 0 : (pricingTiers.length > 0 ? pricingTiers[0].basePrice : 75),
+        tierId: isStage ? undefined : (pricingTiers.length > 0 ? pricingTiers[0].id : undefined),
         rowCount: isStage ? 0 : rowCount,
         seatsPerRow: isStage ? 0 : seatsPerRow,
         seats: isStage ? [] : generateSeats(geometry, rowCount, seatsPerRow),
@@ -268,7 +272,7 @@ export function AdminCanvasWorkspace() {
       return [...prev, newSection];
     });
     setSelectedId(id);
-  }, [generateSeats, getNextColor]);
+  }, [generateSeats, getNextColor, pricingTiers]);
 
   /* ── Mouse handlers ──────────────────────────────────────────────────── */
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
@@ -438,7 +442,7 @@ export function AdminCanvasWorkspace() {
       finalizeSection(pts, 'CIRCLE');
       setRectStart(null); setRectCurrent(null); setDrawing(false); setTool('select');
     }
-  }, [drawing, tool, rectStart, getSVGPoint, finalizeSection, draggedSectionId]);
+  }, [drawing, tool, rectStart, getSVGPoint, finalizeSection, draggedSectionId, resizingHandle]);
 
   const handleSVGClick = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     // Handled in handleMouseDown/handleDoubleClick
@@ -544,31 +548,44 @@ export function AdminCanvasWorkspace() {
 
   /* ── Save via HTTP endpoint ─────────────────────────────────────────── */
   const handleSave = async () => {
-    setSaving(true); setSavedOk(false); setSaveError(null);
+    if (!layoutName.trim()) {
+      alert('Please enter a layout name');
+      return;
+    }
+    setSaving(true);
+    setSaveError(null);
 
     try {
-      const response = await fetch('/api/layouts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          layoutId: layoutId || undefined,
-          name: layoutName,
-          canvasWidth: CANVAS_W,
-          canvasHeight: CANVAS_H,
-          sections: sections.map((s) => ({
+      const payload = {
+        layoutId: layoutId || undefined,
+        name: layoutName,
+        canvasWidth: CANVAS_W,
+        canvasHeight: CANVAS_H,
+        sections: sections.map((s) => {
+          const isStage = s.shapeType === 'STAGE';
+          return {
             name: s.name,
             code: s.code,
             shapeType: s.shapeType,
             geometry: { ...s.geometry, clipToBoundary: false },
-            price: s.price,
+            price: isStage ? 0 : s.price,
             color: s.color,
-            rowCount: s.rowCount,
-            seatsPerRow: s.seatsPerRow,
-            tierId: s.tierId,
-            seats: s.seats.map((seat) => ({ row: seat.row, number: seat.number, x: seat.x, y: seat.y })),
-          })),
-          pricingTiers,
+            rowCount: isStage ? 0 : s.rowCount,
+            seatsPerRow: isStage ? 0 : s.seatsPerRow,
+            tierId: isStage ? undefined : (s.tierId || undefined),
+            seats: isStage ? [] : s.seats.map((seat) => ({ row: seat.row, number: seat.number, x: seat.x, y: seat.y })),
+          };
         }),
+        pricingTiers,
+      };
+
+      // console.log('DEBUG PAYLOAD:', payload);
+      // alert(`Sending sections: ${payload.sections.length}, pricingTiers: ${payload.pricingTiers ? payload.pricingTiers.length : 'UNDEFINED'}, tierId[0]: ${payload.sections[0]?.tierId}`);
+
+      const response = await fetch('/api/layouts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
       const data = await response.json();
       setSaving(false);
@@ -588,9 +605,9 @@ export function AdminCanvasWorkspace() {
       } else {
         setSaveError(data.error ?? 'Save failed.');
       }
-    } catch (err) {
+    } catch (err: any) {
       setSaving(false);
-      setSaveError('Network error occurred.');
+      setSaveError(err.message ?? 'Unknown error');
     }
   };
 
@@ -917,6 +934,20 @@ export function AdminCanvasWorkspace() {
                         >
                           {`${Math.round(bbox.width)} × ${Math.round(bbox.height)} px`}
                         </text>
+                        {/* Tier Label */}
+                        {s.tierId && (
+                          <text
+                            x={centroid.x}
+                            y={centroid.y + 35}
+                            textAnchor="middle"
+                            fill="var(--text-secondary)"
+                            fontSize="9"
+                            fontWeight="600"
+                            style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}
+                          >
+                            {pricingTiers.find(t => t.id === s.tierId)?.name || 'Standard'}
+                          </text>
+                        )}
                       </g>
                     </>
                   )}
@@ -1028,31 +1059,49 @@ export function AdminCanvasWorkspace() {
 
             {/* Pricing Tier Dropdown */}
             {selectedSection.shapeType !== 'STAGE' && (
-              <Field label="Pricing Tier">
-                <div className="flex gap-2">
-                  <select
-                    value={selectedSection.tierId || ''}
-                    onChange={(e) => {
-                      const tier = pricingTiers.find(t => t.id === e.target.value);
-                      if (tier) {
-                        updateSection(selectedSection.id, { tierId: tier.id, color: tier.color, price: tier.basePrice });
-                      }
-                    }}
-                    className="flex-1 bg-card border-subtle text-primary text-sm rounded-lg px-3 py-2 outline-none border border-default focus:border-accent/50 appearance-none"
-                  >
-                    <option value="" disabled>Select a tier...</option>
-                    {pricingTiers.map(t => (
-                      <option key={t.id} value={t.id}>{t.name} (Rp {t.basePrice.toLocaleString('id-ID')})</option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() => setShowTierManager(true)}
-                    className="px-3 py-2 bg-card border-subtle border border-default rounded-lg text-xs font-semibold text-secondary hover:text-primary transition-colors"
-                  >
-                    Edit
-                  </button>
-                </div>
-              </Field>
+              <>
+                <Field label="Pricing Tier">
+                  <div className="flex gap-2">
+                    <select
+                      value={selectedSection.tierId || ''}
+                      onChange={(e) => {
+                        const selectedVal = e.target.value;
+                        if (!selectedVal) {
+                          updateSection(selectedSection.id, { tierId: undefined });
+                        } else {
+                          const tier = pricingTiers.find(t => t.id === selectedVal);
+                          if (tier) {
+                            updateSection(selectedSection.id, { tierId: tier.id, color: tier.color, price: tier.basePrice });
+                          }
+                        }
+                      }}
+                      className="flex-1 bg-card border-subtle text-primary text-sm rounded-lg px-3 py-2 outline-none border border-default focus:border-accent/50 appearance-none"
+                    >
+                      <option value="">None (Unassigned)</option>
+                      {pricingTiers.map(t => (
+                        <option key={t.id} value={t.id}>{t.name} (Rp {t.basePrice.toLocaleString('id-ID')})</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => setShowTierManager(true)}
+                      className="px-3 py-2 bg-card border-subtle border border-default rounded-lg text-xs font-semibold text-secondary hover:text-primary transition-colors"
+                    >
+                      Edit
+                    </button>
+                  </div>
+                </Field>
+
+                <Field label="Base Price">
+                  <input
+                    type="number"
+                    name="basePrice"
+                    data-testid="input-section-price"
+                    value={selectedSection.price}
+                    onChange={(e) => updateSection(selectedSection.id, { price: Number(e.target.value) })}
+                    className="w-full bg-card border-subtle text-primary text-sm rounded-lg px-3 py-2 outline-none border border-default focus:border-accent/50"
+                  />
+                </Field>
+              </>
             )}
 
             {/* Shape Dimensions Controls (Width & Height) */}

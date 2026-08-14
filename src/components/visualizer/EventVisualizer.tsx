@@ -42,6 +42,7 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
   const [loadingSeats, setLoadingSeats] = useState(false);
   const [selectedSeatIds, setSelectedSeatIds] = useState<Set<string>>(new Set());
   const [globalCart, setGlobalCart] = useState<Map<string, SeatDTO>>(new Map());
+  const heroSectionRef = useRef<HTMLDivElement>(null);
 
   const fetchLiveSectionSeats = useCallback(async (sectionId: string): Promise<SeatDTO[]> => {
     try {
@@ -81,6 +82,10 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
   }, [fetchLiveSectionSeats]);
 
   const lastLockedIdsRef = useRef<string[]>([]);
+  const selectedSeatIdsRef = useRef<Set<string>>(selectedSeatIds);
+  useEffect(() => {
+    selectedSeatIdsRef.current = selectedSeatIds;
+  }, [selectedSeatIds]);
   const [lockError, setLockError] = useState<string | null>(null);
 
   const handleToggleSeat = useCallback((seat: SeatDTO) => {
@@ -137,9 +142,7 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
     setView('map');
     setSelectedSection(null);
     setSeats([]);
-    // lastLockedIdsRef.current = [];
-    // setSelectedSeatIds(new Set());
-  }, [event.id, sessionId]);
+  }, []);
 
   // Real-time Server-Sent Events (SSE) listener & fallback polling
   useEffect(() => {
@@ -161,7 +164,7 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
               prev.map((s) => {
                 if (affectedIds.has(s.id)) {
                   // Don't overwrite locally selected seats for current user
-                  if (selectedSeatIds.has(s.id) && update.userSessionId === sessionId) {
+                  if (selectedSeatIdsRef.current.has(s.id) && update.userSessionId === sessionId) {
                     return s;
                   }
                   return {
@@ -385,7 +388,7 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
       </div>
 
       {/* HERO SECTION */}
-      <div className="w-full border-b border-subtle flex-shrink-0 relative" style={{ height: '60vh', minHeight: '400px' }}>
+      <div ref={heroSectionRef} className="w-full border-b border-subtle flex-shrink-0 relative" style={{ height: '60vh', minHeight: '400px' }}>
         {view === 'map' ? (
           <>
             {/* Full-bleed poster background */}
@@ -458,10 +461,14 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
         <div className="flex-1 flex flex-col gap-8 text-primary pr-4">
           <div className="glass p-6 rounded-2xl border border-subtle">
             <h2 className="text-lg font-bold mb-3 text-primary">Description</h2>
-            <p className="text-sm text-secondary leading-relaxed">
-              Experience an unforgettable journey with <strong>{event.title}</strong> at {event.venueName}. 
-              Prepare yourself for a spectacular show packed with mesmerizing visuals and stunning performances!
-              This event is highly anticipated, so make sure to secure your seats quickly.
+            <p className="text-sm text-secondary leading-relaxed whitespace-pre-line">
+              {event.description ? event.description : (
+                <>
+                  Experience an unforgettable journey with <strong>{event.title}</strong> at {event.venueName}. 
+                  Prepare yourself for a spectacular show packed with mesmerizing visuals and stunning performances!
+                  This event is highly anticipated, so make sure to secure your seats quickly.
+                </>
+              )}
             </p>
           </div>
           
@@ -484,24 +491,35 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
                   const sectionNames = Array.from(new Set(matchingSections.map(s => s.name))).join(', ');
                   
                   return (
-                  <div key={tier.id} className="flex gap-4 items-start border-b border-subtle pb-4 last:border-0 last:pb-0">
-                    <div className="w-4 h-4 rounded mt-1 flex-shrink-0" style={{ background: tier.color }} />
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-semibold text-primary">{tier.name}</span>
-                        <span className="font-mono font-medium text-accent">Rp {tier.basePrice.toLocaleString('id-ID')}</span>
-                      </div>
-                      <p className="text-sm text-secondary mb-1">{tier.description || 'No description available.'}</p>
-                      {sectionNames && (
-                        <p className="text-xs text-muted mb-2 font-medium">Includes: {sectionNames}</p>
-                      )}
-                      {tier.salesEndDate && (
-                        <div className="text-xs font-medium px-2 py-1 bg-secondary inline-block rounded border border-subtle">
-                          Sales end: {new Date(tier.salesEndDate).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    <div key={tier.id} className="flex gap-4 items-start border-b border-subtle pb-4 last:border-0 last:pb-0">
+                      <div className="w-4 h-4 rounded mt-1 flex-shrink-0" style={{ background: tier.color }} />
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-semibold text-primary">{tier.name}</span>
+                          <span className="font-mono font-medium text-accent">Rp {tier.basePrice.toLocaleString('id-ID')}</span>
                         </div>
-                      )}
+                        <p className="text-sm text-secondary mb-1">{tier.description || 'No description available.'}</p>
+                        {sectionNames && (
+                          <p className="text-xs text-muted mb-2 font-medium">Includes: {sectionNames}</p>
+                        )}
+                        <div className="flex items-center justify-between gap-3 mt-2 flex-wrap">
+                          {tier.salesEndDate ? (
+                            <div className="text-xs font-medium px-2 py-1 bg-secondary inline-block rounded border border-subtle">
+                              Sales end: {new Date(tier.salesEndDate).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          ) : <div />}
+
+                          <button
+                            onClick={() => {
+                              heroSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+                            }}
+                            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-accent hover:bg-accent-hover text-white transition-all shadow-sm flex items-center gap-1 ml-auto"
+                          >
+                            Order Now
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
                   );
                 })}
               </div>

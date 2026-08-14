@@ -9,11 +9,15 @@ export async function saveLayoutAction(input: SaveLayoutInput): Promise<{ succes
   try {
     // Pre-process sections so CPU calculations happen before opening DB transaction
     const processedSections = input.sections.map((sec) => {
+      const geomObj = typeof sec.geometry === 'string' ? (() => { try { return JSON.parse(sec.geometry); } catch { return {}; } })() : (sec.geometry || {});
+      const isStage = sec.shapeType === 'STAGE' || geomObj?.shapeType === 'STAGE';
       let seatsToCreate = sec.seats;
-      if (sec.shapeType === 'STAGE' || !seatsToCreate || seatsToCreate.length === 0) {
-        if (sec.shapeType !== 'STAGE' && sec.rowCount > 0 && sec.seatsPerRow > 0) {
+      if (isStage) {
+        seatsToCreate = [];
+      } else if (!seatsToCreate || seatsToCreate.length === 0) {
+        if (sec.rowCount > 0 && sec.seatsPerRow > 0) {
           seatsToCreate = generateSeatGrid({
-            geometry: sec.geometry,
+            geometry: geomObj,
             rowCount: sec.rowCount,
             seatsPerRow: sec.seatsPerRow,
           }) as any;
@@ -23,7 +27,9 @@ export async function saveLayoutAction(input: SaveLayoutInput): Promise<{ succes
       }
       return {
         ...sec,
-        seatsToCreate,
+        shapeType: isStage ? 'STAGE' : sec.shapeType,
+        geometry: geomObj,
+        seatsToCreate: isStage ? [] : seatsToCreate,
       };
     });
 
@@ -55,8 +61,16 @@ export async function saveLayoutAction(input: SaveLayoutInput): Promise<{ succes
 
         // Upsert / sync pricing tiers (preserves existing DB tiers, syncs new/updated ones)
         const tierIdMap: Record<string, string> = {};
-        if (input.pricingTiers && input.pricingTiers.length > 0) {
+        const validTierIds = new Set<string>();
+
+        if (input.pricingTiers !== undefined) {
           const incomingTierIds: string[] = [];
+
+          // Query existing tiers for this layout if updating
+          const existingTiers = input.layoutId
+            ? await tx.pricingTier.findMany({ where: { layoutId: layout.id } })
+            : [];
+          const existingTierMap = new Map(existingTiers.map((t) => [t.id, t]));
 
           for (const t of input.pricingTiers) {
             // Sanitize user inputs
@@ -66,10 +80,25 @@ export async function saveLayoutAction(input: SaveLayoutInput): Promise<{ succes
             const cleanDescription = t.description ? t.description.trim().slice(0, 500) : null;
             const cleanSalesEndDate = t.salesEndDate ? new Date(t.salesEndDate) : null;
 
-            const targetId = (t.id && t.id.length >= 20 && !t.id.startsWith('tier-')) ? t.id : crypto.randomUUID();
+            let targetId: string;
+            if (t.id && existingTierMap.has(t.id)) {
+              // Existing tier for this layout
+              targetId = t.id;
+            } else if (t.id && t.id.length >= 20 && !t.id.startsWith('tier-')) {
+              // Valid UUID or unique ID from caller
+              targetId = t.id;
+            } else if (t.id && (t.id.startsWith('tier-vip-') || t.id.startsWith('tier-std-') || t.id.startsWith('tier-eco-') || t.id.startsWith('tier-prem-'))) {
+              // Known seed/fixture tier ID format
+              targetId = t.id;
+            } else {
+              targetId = t.id && !t.id.startsWith('tier-') ? t.id : crypto.randomUUID();
+            }
+
             if (t.id) {
               tierIdMap[t.id] = targetId;
             }
+            tierIdMap[targetId] = targetId;
+            validTierIds.add(targetId);
             incomingTierIds.push(targetId);
 
             await tx.pricingTier.upsert({
@@ -84,6 +113,7 @@ export async function saveLayoutAction(input: SaveLayoutInput): Promise<{ succes
                 salesEndDate: cleanSalesEndDate,
               },
               update: {
+                layoutId: layout.id,
                 name: cleanName,
                 color: cleanColor,
                 basePrice: cleanBasePrice,
@@ -102,6 +132,13 @@ export async function saveLayoutAction(input: SaveLayoutInput): Promise<{ succes
               },
             });
           }
+        } else if (input.layoutId) {
+          // If pricingTiers was omitted in update payload, fetch existing layout tiers to preserve mappings
+          const existingTiers = await tx.pricingTier.findMany({ where: { layoutId: layout.id } });
+          for (const et of existingTiers) {
+            tierIdMap[et.id] = et.id;
+            validTierIds.add(et.id);
+          }
         }
 
         // Re-create sections and their seats
@@ -109,24 +146,51 @@ export async function saveLayoutAction(input: SaveLayoutInput): Promise<{ succes
           const isStage = sec.shapeType === 'STAGE';
           const dbShapeType = sec.shapeType;
           const geomObj = typeof sec.geometry === 'string' ? JSON.parse(sec.geometry) : sec.geometry;
-          const geomToSave = JSON.stringify({ ...geomObj, shapeType: sec.shapeType, clipToBoundary: false });
+          const geomToSave = JSON.stringify({ ...geomObj, shapeType: dbShapeType, clipToBoundary: false });
+
+          // Determine pricingTierId strictly
+          let resolvedPricingTierId: string | null = null;
+          const incomingTierId = typeof sec.tierId === 'string'
+            ? sec.tierId.trim()
+            : (typeof (sec as any).pricingTierId === 'string' ? (sec as any).pricingTierId.trim() : null);
+
+          if (!isStage && incomingTierId && incomingTierId !== 'null' && incomingTierId !== 'undefined' && incomingTierId !== 'none') {
+            const mappedId = tierIdMap[incomingTierId] || incomingTierId;
+            if (validTierIds.has(mappedId)) {
+              resolvedPricingTierId = mappedId;
+            } else {
+              // Check if mappedId exists in database PricingTier table for this layout or global
+              const dbTier = await tx.pricingTier.findFirst({
+                where: {
+                  id: mappedId,
+                  OR: [{ layoutId: layout.id }, { layoutId: null }],
+                },
+              });
+              if (dbTier) {
+                resolvedPricingTierId = dbTier.id;
+                validTierIds.add(dbTier.id);
+              }
+            }
+          }
+
+          const sectionDataToCreate = {
+            layoutId: layout.id,
+            name: sec.name,
+            code: sec.code,
+            shapeType: dbShapeType as any,
+            geometry: geomToSave,
+            pricingTierId: resolvedPricingTierId,
+            price: isStage ? 0 : (sec.price ?? 0),
+            color: sec.color,
+            rowCount: isStage ? 0 : (sec.rowCount ?? 0),
+            seatsPerRow: isStage ? 0 : (sec.seatsPerRow ?? 0),
+          };
 
           const section = await tx.section.create({
-            data: {
-              layoutId: layout.id,
-              name: sec.name,
-              code: sec.code,
-              shapeType: dbShapeType as any,
-              geometry: geomToSave,
-              pricingTierId: isStage ? null : (sec.tierId ? (tierIdMap[sec.tierId] || sec.tierId) : null),
-              price: isStage ? 0 : sec.price,
-              color: sec.color,
-              rowCount: isStage ? 0 : sec.rowCount,
-              seatsPerRow: isStage ? 0 : sec.seatsPerRow,
-            },
+            data: sectionDataToCreate,
           });
 
-          if (sec.seatsToCreate && sec.seatsToCreate.length > 0) {
+          if (!isStage && sec.seatsToCreate && sec.seatsToCreate.length > 0) {
             await tx.seat.createMany({
               data: sec.seatsToCreate.map((s) => ({
                 sectionId: section.id,
@@ -135,6 +199,7 @@ export async function saveLayoutAction(input: SaveLayoutInput): Promise<{ succes
                 x: s.x,
                 y: s.y,
                 status: 'AVAILABLE',
+                pricingTierId: resolvedPricingTierId,
               })),
             });
           }
@@ -159,6 +224,7 @@ export async function getLayouts() {
   const layouts = await prisma.venueLayout.findMany({
     orderBy: { updatedAt: 'desc' },
     include: {
+      pricingTiers: true,
       sections: {
         include: { _count: { select: { seats: true } } },
       },
@@ -179,8 +245,9 @@ export async function getLayoutById(layoutId: string) {
   const layout = await prisma.venueLayout.findUnique({
     where: { id: layoutId },
     include: {
+      pricingTiers: true,
       sections: {
-        include: { seats: true },
+        include: { seats: true, pricingTier: true },
       },
     },
   });

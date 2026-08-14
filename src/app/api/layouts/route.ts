@@ -28,6 +28,7 @@ export async function GET(request: Request) {
           sections: {
             include: {
               seats: true,
+              pricingTier: true,
             },
           },
         },
@@ -54,6 +55,7 @@ export async function GET(request: Request) {
         sections: {
           include: {
             seats: true,
+            pricingTier: true,
           },
         },
       },
@@ -85,7 +87,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as SaveLayoutInput;
+    const rawBody = await request.text();
+    const body = JSON.parse(rawBody) as SaveLayoutInput;
     const result = await saveLayoutAction(body);
 
     if (result.success && result.layoutId) {
@@ -93,9 +96,11 @@ export async function POST(request: Request) {
       const layout = await prisma.venueLayout.findUnique({
         where: { id: result.layoutId },
         include: {
+          pricingTiers: true,
           sections: {
             include: {
               seats: true,
+              pricingTier: true,
             },
           },
         },
