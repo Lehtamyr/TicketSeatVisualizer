@@ -34,7 +34,6 @@ export async function saveLayoutAction(input: SaveLayoutInput): Promise<{ succes
         if (input.layoutId) {
           // Update existing layout — delete old sections (cascade deletes seats)
           await tx.section.deleteMany({ where: { layoutId: input.layoutId } });
-          await tx.pricingTier.deleteMany({ where: { layoutId: input.layoutId } });
           layout = await tx.venueLayout.update({
             where: { id: input.layoutId },
             data: {
@@ -54,26 +53,55 @@ export async function saveLayoutAction(input: SaveLayoutInput): Promise<{ succes
           });
         }
 
-        // Re-create pricing tiers
+        // Upsert / sync pricing tiers (preserves existing DB tiers, syncs new/updated ones)
         const tierIdMap: Record<string, string> = {};
         if (input.pricingTiers && input.pricingTiers.length > 0) {
-          await tx.pricingTier.createMany({
-            data: input.pricingTiers.map(t => {
-              const newId = crypto.randomUUID();
-              if (t.id) {
-                tierIdMap[t.id] = newId;
-              }
-              return {
-                id: newId,
+          const incomingTierIds: string[] = [];
+
+          for (const t of input.pricingTiers) {
+            // Sanitize user inputs
+            const cleanName = (t.name || 'Untitled Tier').trim().slice(0, 100);
+            const cleanColor = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(t.color) ? t.color : '#6366f1';
+            const cleanBasePrice = Math.max(0, Math.floor(Number(t.basePrice) || 0));
+            const cleanDescription = t.description ? t.description.trim().slice(0, 500) : null;
+            const cleanSalesEndDate = t.salesEndDate ? new Date(t.salesEndDate) : null;
+
+            const targetId = (t.id && t.id.length >= 20 && !t.id.startsWith('tier-')) ? t.id : crypto.randomUUID();
+            if (t.id) {
+              tierIdMap[t.id] = targetId;
+            }
+            incomingTierIds.push(targetId);
+
+            await tx.pricingTier.upsert({
+              where: { id: targetId },
+              create: {
+                id: targetId,
                 layoutId: layout.id,
-                name: t.name,
-                color: t.color,
-                basePrice: t.basePrice,
-                description: t.description,
-                salesEndDate: t.salesEndDate ? new Date(t.salesEndDate) : null,
-              };
-            })
-          });
+                name: cleanName,
+                color: cleanColor,
+                basePrice: cleanBasePrice,
+                description: cleanDescription,
+                salesEndDate: cleanSalesEndDate,
+              },
+              update: {
+                name: cleanName,
+                color: cleanColor,
+                basePrice: cleanBasePrice,
+                description: cleanDescription,
+                salesEndDate: cleanSalesEndDate,
+              },
+            });
+          }
+
+          // Delete only tiers that were explicitly removed in the editor
+          if (input.layoutId) {
+            await tx.pricingTier.deleteMany({
+              where: {
+                layoutId: layout.id,
+                id: { notIn: incomingTierIds },
+              },
+            });
+          }
         }
 
         // Re-create sections and their seats

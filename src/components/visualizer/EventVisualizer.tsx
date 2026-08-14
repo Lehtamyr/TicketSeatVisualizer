@@ -385,22 +385,23 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
       </div>
 
       {/* HERO SECTION */}
-      <div className="w-full bg-secondary border-b border-subtle flex-shrink-0" style={{ height: '60vh', minHeight: '400px' }}>
+      <div className="w-full border-b border-subtle flex-shrink-0 relative" style={{ height: '60vh', minHeight: '400px' }}>
         {view === 'map' ? (
-          <div className="w-full h-full flex items-center justify-center max-w-7xl mx-auto p-6 gap-8">
-            {/* Left: Poster */}
-            <div className="w-[35%] h-full rounded-2xl overflow-hidden shadow-2xl relative border border-subtle bg-card">
-              <img src="/img/Home%20sweet%20Loan%20Poster.jpeg" alt="Event Poster" className="object-cover w-full h-full opacity-90" />
+          <>
+            {/* Full-bleed poster background */}
+            <img src="/img/Home%20sweet%20Loan%20Poster.jpeg" alt="" className="absolute inset-0 w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+            {/* Venue Map on top */}
+            <div className="relative z-10 w-full h-full flex items-center justify-center max-w-5xl mx-auto p-6">
+              <div className="w-full h-full glass rounded-2xl border border-subtle p-2 shadow-xl relative overflow-hidden">
+                <VenueMapCanvas
+                  event={event}
+                  onSectionSelect={handleSectionSelect}
+                  selectedSectionId={selectedSection?.id}
+                />
+              </div>
             </div>
-            {/* Right: Venue Map */}
-            <div className="w-[65%] h-full glass rounded-2xl border border-subtle p-2 shadow-xl relative overflow-hidden">
-              <VenueMapCanvas
-                event={event}
-                onSectionSelect={handleSectionSelect}
-                selectedSectionId={selectedSection?.id}
-              />
-            </div>
-          </div>
+          </>
         ) : (
           <div className="w-full h-full max-w-7xl mx-auto p-6">
             {/* Seat Grid Picker filling the Hero Section */}

@@ -149,7 +149,6 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
                   fillOpacity="0.85"
                   stroke="var(--border-accent)"
                   strokeWidth="2.5"
-                  filter="url(#glow-filter)"
                 />
                 <text
                   x={centroid.x}
@@ -213,7 +212,6 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
                 fillOpacity={isHovered || isSelected ? 0.55 : 0.35}
                 stroke={isSelected ? '#ffffff' : isHovered ? section.color : `${section.color}80`}
                 strokeWidth={isSelected ? 2.5 : isHovered ? 2 : 1}
-                filter={isHovered || isSelected ? 'url(#glow-filter)' : undefined}
                 style={{ transition: 'all 0.2s ease', cursor: 'pointer' }}
                 onClick={() => onSectionSelect(section)}
               />

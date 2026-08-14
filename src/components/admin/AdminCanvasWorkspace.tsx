@@ -564,6 +564,7 @@ export function AdminCanvasWorkspace() {
             color: s.color,
             rowCount: s.rowCount,
             seatsPerRow: s.seatsPerRow,
+            tierId: s.tierId,
             seats: s.seats.map((seat) => ({ row: seat.row, number: seat.number, x: seat.x, y: seat.y })),
           })),
           pricingTiers,
@@ -622,15 +623,15 @@ export function AdminCanvasWorkspace() {
               { key: 'triangle', icon: Triangle, label: 'Triangle' },
               { key: 'polygon', icon: Pentagon, label: 'Polygon' },
               { key: 'circle', icon: Circle, label: 'Circle' },
-              { key: 'stage', icon: Grid3X3, label: 'Stage 🎭' },
+              { key: 'stage', icon: Grid3X3, label: 'Stage' },
             ] as const).map(({ key, icon: Icon, label }) => (
               <button
                 key={key}
                 data-testid={`tool-${key}`}
                 onClick={() => { setTool(key); setDrawing(false); setPolyPoints([]); setRectStart(null); }}
                 className={`flex flex-col items-center gap-1 py-2 px-1 rounded-lg text-xs font-medium transition-all ${tool === key
-                    ? 'bg-accent text-primary'
-                    : 'text-muted hover:bg-card border-subtle hover:text-primary'
+                  ? 'bg-accent text-primary'
+                  : 'text-muted hover:bg-card border-subtle hover:text-primary'
                   }`}
               >
                 <Icon size={14} />
@@ -651,7 +652,7 @@ export function AdminCanvasWorkspace() {
                 }`}
             >
               <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: s.color }} />
-              <span className="text-xs text-slate-200 flex-1 truncate">{s.name}</span>
+              <span className="text-xs text-primary flex-1 truncate">{s.name}</span>
               <span className="text-xs text-muted">{s.seats.length}</span>
               <button onClick={(e) => { e.stopPropagation(); deleteSection(s.id); }}
                 className="text-slate-600 hover:text-red-400 transition-colors">
@@ -678,8 +679,8 @@ export function AdminCanvasWorkspace() {
             data-testid="toggle-snap-grid"
             onClick={() => setSnapToGrid((prev) => !prev)}
             className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border font-medium transition-all ${snapToGrid
-                ? 'bg-accent/30 border-accent/50 text-accent shadow-sm'
-                : 'bg-white/[0.04] border-default text-muted hover:text-primary'
+              ? 'bg-accent/30 border-accent/50 text-accent shadow-sm'
+              : 'bg-white/[0.04] border-default text-muted hover:text-primary'
               }`}
             title="Toggle 20px Grid Snapping"
           >
@@ -783,86 +784,7 @@ export function AdminCanvasWorkspace() {
                     </g>
                   ))}
 
-                  {/* Block Centroid Labels: Code, Name, and Size Measurement */}
-                  <g style={{ pointerEvents: 'none' }}>
-                    <text x={centroid.x} y={centroid.y - 12} textAnchor="middle"
-                      fill="var(--canvas-text)" fontSize="11" fontWeight="700" fontFamily="Inter, sans-serif">{s.code}</text>
-                    <text x={centroid.x} y={centroid.y + 2} textAnchor="middle"
-                      fill="var(--text-secondary)" fontSize="9" fontFamily="Inter, sans-serif">{s.name}</text>
-                    {/* Size measurement label pill */}
-                    <rect
-                      x={centroid.x - 40}
-                      y={centroid.y + 10}
-                      width="80"
-                      height="15"
-                      rx="4"
-                      fill="var(--bg-card)"
-                      stroke="var(--border-default)"
-                      strokeWidth="0.8"
-                    />
-                    <text
-                      x={centroid.x}
-                      y={centroid.y + 21}
-                      textAnchor="middle"
-                      fill="var(--canvas-text)"
-                      fontSize="8.5"
-                      fontWeight="600"
-                      fontFamily="JetBrains Mono, monospace"
-                    >
-                      {`${Math.round(bbox.width)} × ${Math.round(bbox.height)} px`}
-                    </text>
-                  </g>
-
-                  {/* Selected Shape Bounding Box CAD Dimension Lines */}
-                  {isSelected && (
-                    <g style={{ pointerEvents: 'none' }}>
-                      {/* Top Width Dimension Line */}
-                      <line x1={bbox.minX} y1={bbox.minY - 10} x2={bbox.maxX} y2={bbox.minY - 10} stroke="var(--accent-primary)" strokeWidth="1" strokeDasharray="3 2" />
-                      <text x={(bbox.minX + bbox.maxX) / 2} y={bbox.minY - 14} textAnchor="middle" fill="var(--canvas-text)" fontSize="8.5" fontFamily="JetBrains Mono, monospace" fontWeight="600">
-                        {`w: ${Math.round(bbox.width)}px`}
-                      </text>
-                      {/* Right Height Dimension Line */}
-                      <line x1={bbox.maxX + 10} y1={bbox.minY} x2={bbox.maxX + 10} y2={bbox.maxY} stroke="var(--accent-primary)" strokeWidth="1" strokeDasharray="3 2" />
-                      <text x={bbox.maxX + 15} y={(bbox.minY + bbox.maxY) / 2 + 3} textAnchor="start" fill="var(--canvas-text)" fontSize="8.5" fontFamily="JetBrains Mono, monospace" fontWeight="600">
-                        {`h: ${Math.round(bbox.height)}px`}
-                      </text>
-                    </g>
-                  )}
-                  {/* Selected Shape Interactive Corner Resize Handles */}
-                  {isSelected && (
-                    <g>
-                      {/* Top-Left Handle */}
-                      <rect
-                        x={bbox.minX - 5} y={bbox.minY - 5} width="10" height="10"
-                        fill="#38bdf8" stroke="#ffffff" strokeWidth="1.5" rx="2"
-                        style={{ cursor: 'nwse-resize' }}
-                        onMouseDown={(e) => { e.stopPropagation(); setResizingHandle({ sectionId: s.id, handle: 'tl' }); }}
-                      />
-                      {/* Top-Right Handle */}
-                      <rect
-                        x={bbox.maxX - 5} y={bbox.minY - 5} width="10" height="10"
-                        fill="#38bdf8" stroke="#ffffff" strokeWidth="1.5" rx="2"
-                        style={{ cursor: 'nesw-resize' }}
-                        onMouseDown={(e) => { e.stopPropagation(); setResizingHandle({ sectionId: s.id, handle: 'tr' }); }}
-                      />
-                      {/* Bottom-Left Handle */}
-                      <rect
-                        x={bbox.minX - 5} y={bbox.maxY - 5} width="10" height="10"
-                        fill="#38bdf8" stroke="#ffffff" strokeWidth="1.5" rx="2"
-                        style={{ cursor: 'nesw-resize' }}
-                        onMouseDown={(e) => { e.stopPropagation(); setResizingHandle({ sectionId: s.id, handle: 'bl' }); }}
-                      />
-                      {/* Bottom-Right Handle */}
-                      <rect
-                        x={bbox.maxX - 5} y={bbox.maxY - 5} width="10" height="10"
-                        fill="#38bdf8" stroke="#ffffff" strokeWidth="1.5" rx="2"
-                        style={{ cursor: 'nwse-resize' }}
-                        onMouseDown={(e) => { e.stopPropagation(); setResizingHandle({ sectionId: s.id, handle: 'br' }); }}
-                      />
-                    </g>
-                  )}
-
-                  {/* Fill Path (drawn on top) */}
+                  {/* Fill Path */}
                   {s.shapeType === 'STAGE' ? (
                     <g key={`stage-shape-${s.id}`}>
                       <path
@@ -898,24 +820,105 @@ export function AdminCanvasWorkspace() {
                       </text>
                     </g>
                   ) : (
-                    <path
-                      d={path}
-                      data-testid={`admin-section-shape-${idx + 1}`}
-                      className="canvas-section"
-                      fill={s.color}
-                      fillOpacity={isSelected ? 0.45 : 0.25}
-                      stroke={isSelected ? '#fff' : s.color}
-                      strokeWidth={isSelected ? 2 : 1.5}
-                      style={{ cursor: tool === 'select' ? 'move' : 'pointer' }}
-                      onMouseDown={(e) => {
-                        if (tool === 'select') {
-                          e.stopPropagation();
-                          setSelectedId(s.id);
-                          setDraggedSectionId(s.id);
-                          setDragStartPt(getSVGPoint(e));
-                        }
-                      }}
-                    />
+                    <>
+                      <path
+                        d={path}
+                        data-testid={`admin-section-shape-${idx + 1}`}
+                        className="canvas-section"
+                        fill={s.color}
+                        fillOpacity={isSelected ? 0.45 : 0.25}
+                        stroke={isSelected ? '#fff' : s.color}
+                        strokeWidth={isSelected ? 2 : 1.5}
+                        style={{ cursor: tool === 'select' ? 'move' : 'pointer' }}
+                        onMouseDown={(e) => {
+                          if (tool === 'select') {
+                            e.stopPropagation();
+                            setSelectedId(s.id);
+                            setDraggedSectionId(s.id);
+                            setDragStartPt(getSVGPoint(e));
+                          }
+                        }}
+                      />
+
+                      {/* Selected Shape Bounding Box CAD Dimension Lines */}
+                      {isSelected && (
+                        <g style={{ pointerEvents: 'none' }}>
+                          {/* Top Width Dimension Line */}
+                          <line x1={bbox.minX} y1={bbox.minY - 10} x2={bbox.maxX} y2={bbox.minY - 10} stroke="var(--accent-primary)" strokeWidth="1" strokeDasharray="3 2" />
+                          <text x={(bbox.minX + bbox.maxX) / 2} y={bbox.minY - 14} textAnchor="middle" fill="var(--canvas-text)" fontSize="8.5" fontFamily="JetBrains Mono, monospace" fontWeight="600">
+                            {`w: ${Math.round(bbox.width)}px`}
+                          </text>
+                          {/* Right Height Dimension Line */}
+                          <line x1={bbox.maxX + 10} y1={bbox.minY} x2={bbox.maxX + 10} y2={bbox.maxY} stroke="var(--accent-primary)" strokeWidth="1" strokeDasharray="3 2" />
+                          <text x={bbox.maxX + 15} y={(bbox.minY + bbox.maxY) / 2 + 3} textAnchor="start" fill="var(--canvas-text)" fontSize="8.5" fontFamily="JetBrains Mono, monospace" fontWeight="600">
+                            {`h: ${Math.round(bbox.height)}px`}
+                          </text>
+                        </g>
+                      )}
+                      {/* Selected Shape Interactive Corner Resize Handles */}
+                      {isSelected && (
+                        <g>
+                          {/* Top-Left Handle */}
+                          <rect
+                            x={bbox.minX - 5} y={bbox.minY - 5} width="10" height="10"
+                            fill="#38bdf8" stroke="#ffffff" strokeWidth="1.5" rx="2"
+                            style={{ cursor: 'nwse-resize' }}
+                            onMouseDown={(e) => { e.stopPropagation(); setResizingHandle({ sectionId: s.id, handle: 'tl' }); }}
+                          />
+                          {/* Top-Right Handle */}
+                          <rect
+                            x={bbox.maxX - 5} y={bbox.minY - 5} width="10" height="10"
+                            fill="#38bdf8" stroke="#ffffff" strokeWidth="1.5" rx="2"
+                            style={{ cursor: 'nesw-resize' }}
+                            onMouseDown={(e) => { e.stopPropagation(); setResizingHandle({ sectionId: s.id, handle: 'tr' }); }}
+                          />
+                          {/* Bottom-Left Handle */}
+                          <rect
+                            x={bbox.minX - 5} y={bbox.maxY - 5} width="10" height="10"
+                            fill="#38bdf8" stroke="#ffffff" strokeWidth="1.5" rx="2"
+                            style={{ cursor: 'nesw-resize' }}
+                            onMouseDown={(e) => { e.stopPropagation(); setResizingHandle({ sectionId: s.id, handle: 'bl' }); }}
+                          />
+                          {/* Bottom-Right Handle */}
+                          <rect
+                            x={bbox.maxX - 5} y={bbox.maxY - 5} width="10" height="10"
+                            fill="#38bdf8" stroke="#ffffff" strokeWidth="1.5" rx="2"
+                            style={{ cursor: 'nwse-resize' }}
+                            onMouseDown={(e) => { e.stopPropagation(); setResizingHandle({ sectionId: s.id, handle: 'br' }); }}
+                          />
+                        </g>
+                      )}
+
+                      {/* Block Centroid Labels: Code, Name, and Size Measurement (Drawn on top of path) */}
+                      <g style={{ pointerEvents: 'none' }}>
+                        <text x={centroid.x} y={centroid.y - 12} textAnchor="middle"
+                          fill="var(--canvas-text)" fontSize="11" fontWeight="700" fontFamily="Inter, sans-serif">{s.code}</text>
+                        <text x={centroid.x} y={centroid.y + 2} textAnchor="middle"
+                          fill="var(--text-secondary)" fontSize="9" fontFamily="Inter, sans-serif">{s.name}</text>
+                        {/* Size measurement label pill */}
+                        <rect
+                          x={centroid.x - 40}
+                          y={centroid.y + 10}
+                          width="80"
+                          height="15"
+                          rx="4"
+                          fill="var(--bg-card)"
+                          stroke="var(--border-default)"
+                          strokeWidth="0.8"
+                        />
+                        <text
+                          x={centroid.x}
+                          y={centroid.y + 21}
+                          textAnchor="middle"
+                          fill="var(--canvas-text)"
+                          fontSize="8.5"
+                          fontWeight="600"
+                          fontFamily="JetBrains Mono, monospace"
+                        >
+                          {`${Math.round(bbox.width)} × ${Math.round(bbox.height)} px`}
+                        </text>
+                      </g>
+                    </>
                   )}
                 </g>
               );
@@ -1181,7 +1184,7 @@ export function AdminCanvasWorkspace() {
                 <X size={20} />
               </button>
             </div>
-            
+
             <div className="flex flex-1 overflow-hidden">
               {/* Left Sidebar: List of Tiers */}
               <div className="w-1/3 border-r border-subtle flex flex-col bg-card border-subtle overflow-hidden">
@@ -1232,9 +1235,11 @@ export function AdminCanvasWorkspace() {
                           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: tier.color }} />
                           {tier.name} Settings
                         </h4>
-                        <button 
+                        <button
                           onClick={() => {
+                            const tierToDelete = pricingTiers[idx];
                             setPricingTiers(pricingTiers.filter((_, i) => i !== idx));
+                            setSections(prev => prev.map(s => s.tierId === tierToDelete.id ? { ...s, tierId: undefined } : s));
                             setSelectedEditTierId(null);
                           }}
                           className="px-3 py-1.5 text-xs text-red-500 hover:bg-red-500/10 rounded-lg transition-colors flex items-center gap-1.5"
@@ -1271,7 +1276,7 @@ export function AdminCanvasWorkspace() {
                             className="w-full bg-card border-subtle text-primary text-sm rounded-lg px-3 py-2 outline-none border border-default focus:border-accent/50"
                           />
                         </Field>
-                        
+
                         <div className="col-span-2">
                           <Field label="Tier Color">
                             <div className="flex items-center gap-4 bg-card border-subtle border border-default rounded-xl p-3">
@@ -1293,9 +1298,9 @@ export function AdminCanvasWorkspace() {
                                   title="Pick Custom Color"
                                 />
                               </label>
-                              
+
                               <div className="h-8 w-px bg-default mx-1" />
-                              
+
                               <div className="flex gap-2 flex-wrap">
                                 {['#f59e0b', '#eab308', '#94a3b8', '#fb923c', '#3b82f6', '#ef4444', '#10b981', '#8b5cf6', '#ec4899', '#0ea5e9'].map((c) => (
                                   <button

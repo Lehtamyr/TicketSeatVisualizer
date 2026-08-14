@@ -43,7 +43,7 @@ export default function HomePage() {
           <Link
             href="/events"
             className="flex items-center gap-2.5 px-8 py-4 rounded-2xl font-semibold text-primary text-sm transition-all duration-200
-              bg-accent hover:bg-accent-hover glow-accent"
+              bg-accent hover:bg-accent-hover"
           >
             <Ticket size={16} />
             Browse Events

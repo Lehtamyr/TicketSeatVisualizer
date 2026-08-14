@@ -186,174 +186,173 @@ export function SeatGridPicker({
             }}
             className="mx-auto block"
           >
-          <defs>
-            <filter id="seat-glow">
-              <feGaussianBlur stdDeviation="2" result="blur" />
-              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-            </filter>
-          </defs>
+            <defs>
+              <filter id="seat-glow">
+                <feGaussianBlur stdDeviation="2" result="blur" />
+                <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+              </filter>
+            </defs>
 
-          {/* Column number header labels — constant font size, one per column */}
-          {uniqueNumbers.map((num, colIndex) => (
-            <text
-              key={`col-header-${num}`}
-              x={colIndex * 46}
-              y={scaledMinY - SEAT_R - 8}
-              textAnchor="middle"
-              fill="var(--canvas-text)"
-              fontSize="9.5"
-              fontWeight="600"
-              fontFamily="JetBrains Mono, monospace"
-              style={{ pointerEvents: 'none', userSelect: 'none' }}
-            >
-              {num}
-            </text>
-          ))}
+            {/* Column number header labels — constant font size, one per column */}
+            {uniqueNumbers.map((num, colIndex) => (
+              <text
+                key={`col-header-${num}`}
+                x={colIndex * 46}
+                y={scaledMinY - SEAT_R - 8}
+                textAnchor="middle"
+                fill="var(--canvas-text)"
+                fontSize="9.5"
+                fontWeight="600"
+                fontFamily="JetBrains Mono, monospace"
+                style={{ pointerEvents: 'none', userSelect: 'none' }}
+              >
+                {num}
+              </text>
+            ))}
 
-          {/* Row labels & Admin row delete actions */}
+            {/* Row labels & Admin row delete actions */}
 
-          {Object.entries(rowGroups).map(([row, rowSeats]) => {
-            const minX = scaledMinX;
-            const y = rowSeats[0].renderY;
-            return (
-              <g key={`row-group-${row}`}>
-                <text
-                  x={minX - SEAT_R - (adminMode ? 32 : 12)}
-                  y={y + 4.5}
-                  textAnchor="end"
-                  fill="var(--canvas-text)"
-                  fontSize="11.5"
-                  fontWeight="600"
-                  fontFamily="JetBrains Mono, monospace"
-                >
-                  Row {row}
-                </text>
-
-                {adminMode && onDeleteRow && (
-                  <g
-                    onClick={() => onDeleteRow(row)}
-                    className="cursor-pointer hover:opacity-100 opacity-60 transition-opacity"
+            {Object.entries(rowGroups).map(([row, rowSeats]) => {
+              const minX = scaledMinX;
+              const y = rowSeats[0].renderY;
+              return (
+                <g key={`row-group-${row}`}>
+                  <text
+                    x={minX - SEAT_R - (adminMode ? 32 : 12)}
+                    y={y + 4.5}
+                    textAnchor="end"
+                    fill="var(--canvas-text)"
+                    fontSize="11.5"
+                    fontWeight="600"
+                    fontFamily="JetBrains Mono, monospace"
                   >
-                    <title>{`Delete Row ${row}`}</title>
-                    <rect
-                      x={minX - SEAT_R - 26}
-                      y={y - 6}
-                      width="20"
-                      height="12"
-                      rx="3"
-                      fill="rgba(239, 68, 68, 0.25)"
-                      stroke="rgba(239, 68, 68, 0.6)"
-                      strokeWidth="0.8"
-                    />
-                    <text
-                      x={minX - SEAT_R - 16}
-                      y={y + 3}
-                      textAnchor="middle"
-                      fill="var(--seat-reserved)"
-                      fontSize="7"
-                      fontWeight="bold"
+                    Row {row}
+                  </text>
+
+                  {adminMode && onDeleteRow && (
+                    <g
+                      onClick={() => onDeleteRow(row)}
+                      className="cursor-pointer hover:opacity-100 opacity-60 transition-opacity"
                     >
-                      🗑
-                    </text>
-                  </g>
-                )}
-              </g>
-            );
-          })}
+                      <title>{`Delete Row ${row}`}</title>
+                      <rect
+                        x={minX - SEAT_R - 26}
+                        y={y - 6}
+                        width="20"
+                        height="12"
+                        rx="3"
+                        fill="rgba(239, 68, 68, 0.25)"
+                        stroke="rgba(239, 68, 68, 0.6)"
+                        strokeWidth="0.8"
+                      />
+                      <text
+                        x={minX - SEAT_R - 16}
+                        y={y + 3}
+                        textAnchor="middle"
+                        fill="var(--seat-reserved)"
+                        fontSize="7"
+                        fontWeight="bold"
+                      >
+                        🗑
+                      </text>
+                    </g>
+                  )}
+                </g>
+              );
+            })}
 
-          {/* Seats with Dual-Stroke Non-Overlapping Border Rings */}
-          {scaledSeats.map((seat) => {
-            const seatKey = `${seat.row}-${seat.number}`;
-            const isDisabledInAdmin = disabledSeatKeys.includes(seatKey);
-            const isSelected = selectedIds.has(seat.id);
-            // ponytail: If it's HELD and we didn't select it, it's held by someone else. 
-            // The DB doesn't return heldBy, so checking it was a bug.
-            const isHeld = seat.status === 'HELD' && !isSelected;
-            const isReserved = (seat.status === 'RESERVED' || seat.status === 'BLOCKED') && !adminMode;
-            const isAvailable = !isSelected && !isHeld && !isReserved && !isDisabledInAdmin;
-            const isBlocked = adminMode ? false : (isSelected ? false : (isReserved || isHeld || isDisabledInAdmin));
+            {/* Seats with Dual-Stroke Non-Overlapping Border Rings */}
+            {scaledSeats.map((seat) => {
+              const seatKey = `${seat.row}-${seat.number}`;
+              const isDisabledInAdmin = disabledSeatKeys.includes(seatKey);
+              const isSelected = selectedIds.has(seat.id);
+              // ponytail: If it's HELD and we didn't select it, it's held by someone else. 
+              // The DB doesn't return heldBy, so checking it was a bug.
+              const isHeld = seat.status === 'HELD' && !isSelected;
+              const isReserved = (seat.status === 'RESERVED' || seat.status === 'BLOCKED') && !adminMode;
+              const isAvailable = !isSelected && !isHeld && !isReserved && !isDisabledInAdmin;
+              const isBlocked = adminMode ? false : (isSelected ? false : (isReserved || isHeld || isDisabledInAdmin));
 
-            let fillClass = '';
-            if (isSelected) fillClass = 'seat-selected';
-            else if (isDisabledInAdmin) fillClass = 'seat-disabled-admin';
-            else if (isAvailable) fillClass = 'seat-available';
-            else if (isHeld) fillClass = 'seat-held';
-            else fillClass = 'seat-reserved';
+              let fillClass = '';
+              if (isSelected) fillClass = 'seat-selected';
+              else if (isDisabledInAdmin) fillClass = 'seat-disabled-admin';
+              else if (isAvailable) fillClass = 'seat-available';
+              else if (isHeld) fillClass = 'seat-held';
+              else fillClass = 'seat-reserved';
 
-            const strokeColor = isSelected
-              ? 'var(--accent-primary)'
-              : isDisabledInAdmin
-              ? 'rgba(239, 68, 68, 0.85)'
-              : isAvailable
-              ? 'rgba(0,0,0,0.15)'
-              : isHeld
-              ? '#f59e0b'
-              : 'rgba(0,0,0,0.1)';
+              const strokeColor = isSelected
+                ? 'var(--accent-primary)'
+                : isDisabledInAdmin
+                  ? 'rgba(239, 68, 68, 0.85)'
+                  : isAvailable
+                    ? 'rgba(0,0,0,0.15)'
+                    : isHeld
+                      ? '#f59e0b'
+                      : 'rgba(0,0,0,0.1)';
 
-            if (isDisabledInAdmin && !adminMode) return null; // ponytail: completely hide admin-disabled seats from users
+              if (isDisabledInAdmin && !adminMode) return null; // ponytail: completely hide admin-disabled seats from users
 
-            const testIdAttr = `seat-button-${seat.id}`;
+              const testIdAttr = `seat-button-${seat.id}`;
 
-            return (
-              <g key={seat.id}>
-                {/* Outer dark isolating ring preventing circle overlap */}
-                <circle
-                  cx={seat.renderX}
-                  cy={seat.renderY}
-                  r={SEAT_R + 1.5}
-                  fill="none"
-                  stroke="var(--bg-primary)"
-                  strokeWidth="2.5"
-                  style={{ pointerEvents: 'none' }}
-                />
+              return (
+                <g key={seat.id}>
+                  {/* Outer dark isolating ring preventing circle overlap */}
+                  <circle
+                    cx={seat.renderX}
+                    cy={seat.renderY}
+                    r={SEAT_R + 1.5}
+                    fill="none"
+                    stroke="var(--bg-primary)"
+                    strokeWidth="2.5"
+                    style={{ pointerEvents: 'none' }}
+                  />
 
-                {/* Inner Seat Circle */}
-                <circle
-                  data-testid={testIdAttr}
-                  data-status={isSelected ? 'SELECTED' : seat.status}
-                  cx={seat.renderX}
-                  cy={seat.renderY}
-                  r={SEAT_R}
-                  fill={isDisabledInAdmin ? "rgba(239, 68, 68, 0.25)" : undefined}
-                  stroke={strokeColor}
-                  strokeWidth={isDisabledInAdmin ? 1.5 : seatStrokeW}
-                  strokeDasharray={isDisabledInAdmin ? "2.5 1.5" : undefined}
-                  className={`seat-circle ${fillClass}${isSelected ? ' selected active' : ''}${isHeld ? ' held' : ''}`}
-                  filter={isSelected ? 'url(#seat-glow)' : undefined}
-                  role="button"
-                  aria-disabled={isBlocked ? 'true' : undefined}
-                  onClick={() => {
-                    if (adminMode && onToggleDisabledSeat) {
-                      onToggleDisabledSeat(section.id, seat.row, seat.number);
-                    } else if (!isBlocked) {
-                      onToggleSeat(seat);
-                    }
-                  }}
-                  style={{ cursor: isBlocked ? 'not-allowed' : 'pointer', pointerEvents: 'auto' }}
-                >
-                  <title>{isDisabledInAdmin ? (adminMode ? 'Disabled Seat (Click to restore)' : 'Disabled / Unavailable Seat') : isReserved ? 'Sold' : isHeld ? 'Held' : `Row ${seat.row} · Seat ${seat.number} · $${seat.price}`}</title>
-                </circle>
-              </g>
-            );
-          })}
+                  {/* Inner Seat Circle */}
+                  <circle
+                    data-testid={testIdAttr}
+                    data-status={isSelected ? 'SELECTED' : seat.status}
+                    cx={seat.renderX}
+                    cy={seat.renderY}
+                    r={SEAT_R}
+                    fill={isDisabledInAdmin ? "rgba(239, 68, 68, 0.25)" : undefined}
+                    stroke={strokeColor}
+                    strokeWidth={isDisabledInAdmin ? 1.5 : seatStrokeW}
+                    strokeDasharray={isDisabledInAdmin ? "2.5 1.5" : undefined}
+                    className={`seat-circle ${fillClass}${isSelected ? ' selected active' : ''}${isHeld ? ' held' : ''}`}
+                    role="button"
+                    aria-disabled={isBlocked ? 'true' : undefined}
+                    onClick={() => {
+                      if (adminMode && onToggleDisabledSeat) {
+                        onToggleDisabledSeat(section.id, seat.row, seat.number);
+                      } else if (!isBlocked) {
+                        onToggleSeat(seat);
+                      }
+                    }}
+                    style={{ cursor: isBlocked ? 'not-allowed' : 'pointer', pointerEvents: 'auto' }}
+                  >
+                    <title>{isDisabledInAdmin ? (adminMode ? 'Disabled Seat (Click to restore)' : 'Disabled / Unavailable Seat') : isReserved ? 'Sold' : isHeld ? 'Held' : `Row ${seat.row} · Seat ${seat.number} · $${seat.price}`}</title>
+                  </circle>
+                </g>
+              );
+            })}
 
-          {/* Seat number labels for selected */}
-          {scaledSeats.filter((s) => selectedIds.has(s.id)).map((seat) => (
-            <text
-              key={`label-${seat.id}`}
-              x={seat.renderX}
-              y={seat.renderY + 3.5}
-              textAnchor="middle"
-              fill="var(--text-primary)"
-              fontSize="9.5"
-              fontWeight="bold"
-              fontFamily="Inter, sans-serif"
-              style={{ pointerEvents: 'none' }}
-            >
-              {seat.number}
-            </text>
-          ))}
-        </svg>
+            {/* Seat number labels for selected */}
+            {scaledSeats.filter((s) => selectedIds.has(s.id)).map((seat) => (
+              <text
+                key={`label-${seat.id}`}
+                x={seat.renderX}
+                y={seat.renderY + 3.5}
+                textAnchor="middle"
+                fill="var(--text-primary)"
+                fontSize="9.5"
+                fontWeight="bold"
+                fontFamily="Inter, sans-serif"
+                style={{ pointerEvents: 'none' }}
+              >
+                {seat.number}
+              </text>
+            ))}
+          </svg>
         </div>
       </div>
 

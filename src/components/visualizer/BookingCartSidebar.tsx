@@ -266,8 +266,8 @@ export function BookingCartSidebar({
             onClick={handleCheckout}
             disabled={selectedSeats.length === 0}
             className="w-full py-3 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2
-              bg-accent hover:bg-accent-hover text-primary disabled:opacity-30 disabled:cursor-not-allowed
-              animate-pulse-glow"
+              bg-accent hover:bg-accent-hover text-secondary disabled:opacity-30 disabled:cursor-not-allowed
+                "
           >
             Proceed to Checkout
             <ChevronRight size={16} />
