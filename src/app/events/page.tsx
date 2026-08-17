@@ -49,10 +49,18 @@ export default async function EventsPage() {
                     </div>
                     <div className="flex items-center gap-1.5 mt-1 text-secondary text-sm">
                       <Calendar size={12} />
-                      <span>{new Date(event.startTime).toLocaleDateString('en-US', {
-                        weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
-                        hour: '2-digit', minute: '2-digit',
-                      })}</span>
+                      <span>
+                        {new Date(event.startTime).toLocaleDateString('en-US', {
+                          weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+                          hour: '2-digit', minute: '2-digit',
+                        })}
+                        {event.endTime && (
+                          <> – {new Date(event.endTime).toLocaleDateString('en-US', {
+                            weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit',
+                          })}</>
+                        )}
+                      </span>
                     </div>
                   </div>
                   <ChevronRight size={20} className="text-muted group-hover:text-accent-hover transition-colors mt-1 flex-shrink-0" />

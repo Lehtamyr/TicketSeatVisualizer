@@ -258,21 +258,6 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
           );
         })()}
       </svg>
-
-      <div className="absolute bottom-3 left-3 flex flex-col gap-1.5 glass rounded-lg p-3 text-xs">
-        <div className="flex items-center gap-2">
-          <div className="legend-dot" style={{ background: 'var(--seat-available)' }} />
-          <span className="text-secondary">Available</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="legend-dot" style={{ background: 'var(--seat-held)' }} />
-          <span className="text-secondary">Limited</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="legend-dot" style={{ background: 'var(--seat-reserved)' }} />
-          <span className="text-secondary">Sold Out</span>
-        </div>
-      </div>
     </div>
   );
 }

@@ -12,11 +12,11 @@
   --border-subtle: rgba(0, 73, 204, 0.1);
   --border-default: rgba(0, 73, 204, 0.2);
   --border-accent: rgba(0, 73, 204, 0.4);
-  --text-primary: #494A4A;
-  --text-secondary: #c0c1c3;
+  --text-primary: #11143b;
+  --text-secondary: #3a4f73;
   --text-muted: #A1A3A8;
-  --accent-primary: #0049CC;
-  --accent-hover: #007AFF;
+  --accent-primary: #2572ff;
+  --accent-hover: #5899df;
   --accent-glow: rgba(0, 122, 255, 0.25);
   --seat-available: #D1D5DB;
   --seat-held: #F59E0B;

@@ -15,7 +15,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { title, description, venueName, startTime, layoutId } = body;
+    const { title, description, venueName, startTime, endTime, layoutId } = body;
 
     if (!title || !venueName || !startTime || !layoutId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -45,6 +45,7 @@ export async function POST(request: Request) {
           description: description?.trim() || null,
           venueName,
           startTime: new Date(startTime),
+          endTime: endTime ? new Date(endTime) : null,
           layoutId,
           viewBoxWidth: layout.canvasWidth,
           viewBoxHeight: layout.canvasHeight,

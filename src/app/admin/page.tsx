@@ -20,6 +20,7 @@ interface EventItem {
   title: string;
   venueName: string;
   startTime: string;
+  endTime?: string | null;
   sections: { totalSeats: number; availableSeats: number }[];
 }
 
@@ -35,6 +36,7 @@ export default function AdminDashboardPage() {
   const [eventDescription, setEventDescription] = useState('');
   const [venueName, setVenueName] = useState('');
   const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
   const [creatingEvent, setCreatingEvent] = useState(false);
   const [createSuccess, setCreateSuccess] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -105,11 +107,18 @@ export default function AdminDashboardPage() {
     setEventTitle(`${layout.name} Event`);
     setEventDescription('');
     setVenueName('Main Arena Stadium');
-    // Default to tomorrow same time
+    // Default to tomorrow start time and +3 hours end time
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setMinutes(tomorrow.getMinutes() - tomorrow.getTimezoneOffset());
     setStartTime(tomorrow.toISOString().slice(0, 16));
+
+    const tomorrowEnd = new Date();
+    tomorrowEnd.setDate(tomorrowEnd.getDate() + 1);
+    tomorrowEnd.setHours(tomorrowEnd.getHours() + 3);
+    tomorrowEnd.setMinutes(tomorrowEnd.getMinutes() - tomorrowEnd.getTimezoneOffset());
+    setEndTime(tomorrowEnd.toISOString().slice(0, 16));
+
     setCreateSuccess(false);
     setCreateError(null);
   };
@@ -117,6 +126,11 @@ export default function AdminDashboardPage() {
   const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedLayout) return;
+
+    if (endTime && new Date(endTime) <= new Date(startTime)) {
+      setCreateError('End date & time must be after the start date & time.');
+      return;
+    }
 
     setCreatingEvent(true);
     setCreateError(null);
@@ -131,6 +145,7 @@ export default function AdminDashboardPage() {
           description: eventDescription,
           venueName,
           startTime: new Date(startTime).toISOString(),
+          endTime: endTime ? new Date(endTime).toISOString() : null,
           layoutId: selectedLayout.id,
         }),
       });
@@ -287,8 +302,11 @@ export default function AdminDashboardPage() {
                     <div className="min-w-0 flex-1">
                       <h3 className="text-xs font-semibold text-primary truncate">{e.title}</h3>
                       <p className="text-[10px] text-secondary mt-0.5 truncate">{e.venueName}</p>
-                      <div className="flex items-center gap-3 mt-3 text-[10px] text-muted">
-                        <span>{new Date(e.startTime).toLocaleDateString()}</span>
+                      <div className="flex items-center gap-3 mt-3 text-[10px] text-muted flex-wrap">
+                        <span>
+                          {new Date(e.startTime).toLocaleDateString()}
+                          {e.endTime && ` – ${new Date(e.endTime).toLocaleDateString()}`}
+                        </span>
                         <div className="w-1.5 h-1.5 rounded-full bg-accent/40" />
                         <span>{available} / {total} Available</span>
                       </div>
@@ -369,15 +387,27 @@ export default function AdminDashboardPage() {
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Start Date & Time</label>
-                <input
-                  type="datetime-local"
-                  required
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Start Date & Time</label>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">End Date & Time</label>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all"
+                  />
+                </div>
               </div>
 
               {createError && (
