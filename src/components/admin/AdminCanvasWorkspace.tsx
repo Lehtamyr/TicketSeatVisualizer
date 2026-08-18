@@ -11,7 +11,14 @@ import {
 } from 'lucide-react';
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
-export interface TierDTO { id: string; name: string; color: string; basePrice: number; description?: string; salesEndDate?: string; }
+export interface TierDTO {
+  id: string;
+  name: string;
+  color: string;
+  basePrice: number;
+  description?: string;
+  salesEndDate?: string;
+}
 
 interface AdminSection {
   id: string;

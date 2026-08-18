@@ -20,9 +20,10 @@
   --accent-glow: rgba(0, 122, 255, 0.25);
   --seat-available: #D1D5DB;
   --seat-held: #F59E0B;
-  --seat-reserved: #0049CC;
+  --seat-reserved: #ad352c;
   --seat-blocked: #E5E7EB;
   --seat-selected: #007AFF;
+  --seat-hover: #538cc8ce;
   --canvas-grid: rgba(0, 73, 204, 0.1);
   --canvas-text: #494A4A;
   --mini-text: #007AFF;
@@ -124,7 +125,7 @@ body {
 
 .seat-circle:hover {
   transform: scale(1.3);
-  fill: var(--seat-reserved) !important;
+  fill: var(--seat-selected) !important;
 }
 
 .seat-circle.seat-available {
