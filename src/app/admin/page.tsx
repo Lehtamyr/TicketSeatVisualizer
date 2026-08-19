@@ -51,7 +51,12 @@ export default function AdminDashboardPage() {
           id: l.id,
           name: l.name,
           sectionCount: l.sections?.length || 0,
-          totalSeats: l.sections?.reduce((sum: number, s: any) => sum + (s.seats?.length || 0), 0) || 0,
+          totalSeats:
+            l.totalSeats ??
+            l.sections?.reduce(
+              (sum: number, s: any) => sum + (s._count?.seats ?? s.seats?.length ?? 0),
+              0
+            ) ?? 0,
           updatedAt: l.updatedAt
         })));
       }

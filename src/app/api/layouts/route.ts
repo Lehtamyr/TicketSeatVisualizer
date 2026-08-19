@@ -54,8 +54,8 @@ export async function GET(request: Request) {
         pricingTiers: true,
         sections: {
           include: {
-            seats: true,
             pricingTier: true,
+            _count: { select: { seats: true } },
           },
         },
       },

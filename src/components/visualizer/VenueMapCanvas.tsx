@@ -20,6 +20,7 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
   const [tooltip, setTooltip] = useState<Tooltip | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  const rafRef = useRef<number | null>(null);
 
   const { viewBoxWidth: vbW, viewBoxHeight: vbH, sections } = event;
 
@@ -43,7 +44,10 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
     const x = (e.clientX - rect.left) * scaleX;
     const y = (e.clientY - rect.top) * scaleY;
     if (tooltip) {
-      setTooltip((prev) => prev ? { ...prev, x, y } : null);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        setTooltip((prev) => (prev ? { ...prev, x, y } : null));
+      });
     }
   }, [tooltip, vbW, vbH]);
 

@@ -33,8 +33,25 @@ async function runCleanup() {
   return { message: 'Expired reservations cleaned up.', count: expired.length };
 }
 
+function isAuthorizedCron(request: Request): boolean {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return true; // Allowed in dev/test if secret not configured
+
+  const authHeader = request.headers.get('authorization');
+  if (authHeader === `Bearer ${secret}`) return true;
+
+  const url = new URL(request.url);
+  if (url.searchParams.get('secret') === secret) return true;
+
+  return false;
+}
+
 // Cron cleanup: expire PENDING reservations & release HELD seats (via GET or POST)
-export async function GET() {
+export async function GET(request: Request) {
+  if (!isAuthorizedCron(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const result = await runCleanup();
     return NextResponse.json(result);
@@ -44,7 +61,11 @@ export async function GET() {
   }
 }
 
-export async function POST() {
+export async function POST(request: Request) {
+  if (!isAuthorizedCron(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const result = await runCleanup();
     return NextResponse.json(result);

@@ -25,7 +25,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ even
         } catch (e) {
           clearInterval(pingInterval);
         }
-      }, 1500);
+      }, 15000);
 
       request.signal.addEventListener('abort', () => {
         seatEvents.off('seat-update', listener);
