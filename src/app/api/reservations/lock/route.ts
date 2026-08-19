@@ -1,19 +1,24 @@
 import { NextResponse } from 'next/server';
 import { lockSeatsAction } from '@/actions/lockSeats';
+import { LockSeatsInput } from '@/types/venue';
 
 export async function POST(request: Request) {
   try {
-    let body: any = {};
+    let body: Partial<LockSeatsInput> = {};
     try {
       body = await request.json();
-    } catch (e) {
+    } catch {
       // Empty or invalid body
     }
     const { eventId, seatIds, userSessionId } = body;
 
     // All requests — browser or E2E — go through real DB-backed locking.
     // event-concert-1 is seeded in the DB with fixed IDs so E2E tests work correctly.
-    const result = await lockSeatsAction({ eventId, seatIds, userSessionId });
+    const result = await lockSeatsAction({
+      eventId: eventId ?? '',
+      seatIds: seatIds ?? [],
+      userSessionId: userSessionId ?? '',
+    });
 
     if (result.success && !result.reservationId) {
       // Release-only operation (empty seatIds) — no reservation created

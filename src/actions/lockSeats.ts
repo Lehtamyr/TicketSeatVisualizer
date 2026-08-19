@@ -4,31 +4,58 @@ import { prisma } from '@/lib/prisma';
 import { LockSeatsInput, LockSeatsResult } from '@/types/venue';
 import { broadcastSeatUpdate } from '@/lib/seatBroadcaster';
 
+const LOCK_DURATION_MS = 10 * 60 * 1000; // 10 minutes
+
+class SeatUnavailableError extends Error {
+  unavailableIds: string[];
+  constructor(message: string, unavailableIds: string[]) {
+    super(message);
+    this.name = 'SeatUnavailableError';
+    this.unavailableIds = unavailableIds;
+  }
+}
+
+type TransactionClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+/**
+ * Releases existing pending reservations and their held seats for a given user session.
+ */
+async function releasePendingReservations(
+  tx: TransactionClient,
+  userSessionId: string,
+  eventId?: string
+): Promise<string[]> {
+  const existing = await tx.reservation.findMany({
+    where: { userSessionId, ...(eventId ? { eventId } : {}), status: 'PENDING' },
+    include: { seats: true },
+  });
+
+  const releasedIds: string[] = [];
+  for (const res of existing) {
+    const resSeatIds = res.seats.map((rs) => rs.seatId);
+    releasedIds.push(...resSeatIds);
+    await tx.reservation.update({
+      where: { id: res.id },
+      data: { status: 'EXPIRED' },
+    });
+    await tx.seat.updateMany({
+      where: { id: { in: resSeatIds }, status: 'HELD' },
+      data: { status: 'AVAILABLE' },
+    });
+  }
+  return releasedIds;
+}
+
 export async function lockSeatsAction(input: LockSeatsInput): Promise<LockSeatsResult> {
   const { eventId, seatIds, userSessionId } = input;
 
   // If seatIds is empty or undefined, release all locks for this session
   if (!seatIds || !seatIds.length) {
     try {
-      const releasedIds: string[] = [];
-      await prisma.$transaction(async (tx) => {
-        const existing = await tx.reservation.findMany({
-          where: { userSessionId, eventId, status: 'PENDING' },
-          include: { seats: true },
-        });
-        for (const res of existing) {
-          const resSeatIds = res.seats.map((rs) => rs.seatId);
-          releasedIds.push(...resSeatIds);
-          await tx.reservation.update({
-            where: { id: res.id },
-            data: { status: 'EXPIRED' },
-          });
-          await tx.seat.updateMany({
-            where: { id: { in: resSeatIds }, status: 'HELD' },
-            data: { status: 'AVAILABLE' },
-          });
-        }
-      });
+      const releasedIds = await prisma.$transaction((tx) =>
+        releasePendingReservations(tx, userSessionId, eventId)
+      );
+
       if (releasedIds.length > 0 && eventId) {
         broadcastSeatUpdate({
           eventId,
@@ -47,21 +74,7 @@ export async function lockSeatsAction(input: LockSeatsInput): Promise<LockSeatsR
   try {
     const result = await prisma.$transaction(async (tx) => {
       // 1. Release existing pending reservations for this user session first
-      const existing = await tx.reservation.findMany({
-        where: { userSessionId, eventId, status: 'PENDING' },
-        include: { seats: true },
-      });
-      for (const res of existing) {
-        const resSeatIds = res.seats.map((rs) => rs.seatId);
-        await tx.reservation.update({
-          where: { id: res.id },
-          data: { status: 'EXPIRED' },
-        });
-        await tx.seat.updateMany({
-          where: { id: { in: resSeatIds }, status: 'HELD' },
-          data: { status: 'AVAILABLE' },
-        });
-      }
+      await releasePendingReservations(tx, userSessionId, eventId);
 
       // 1.5 Force a write lock on the target seats (sqlite work-around for SELECT FOR UPDATE)
       await tx.seat.updateMany({
@@ -79,16 +92,20 @@ export async function lockSeatsAction(input: LockSeatsInput): Promise<LockSeatsR
       }
       const unavailable = seats.filter((s) => s.status !== 'AVAILABLE');
       if (unavailable.length > 0) {
-        const err = new Error(`${unavailable.length} seat(s) are no longer available.`);
-        (err as any).unavailableIds = unavailable.map((s) => s.id);
-        throw err;
+        throw new SeatUnavailableError(
+          `${unavailable.length} seat(s) are no longer available.`,
+          unavailable.map((s) => s.id)
+        );
       }
 
       const derivedEventId = eventId || seats[0]?.section.eventId;
       if (!derivedEventId) throw new Error('Event ID could not be determined.');
 
-      const totalAmount = seats.reduce((sum, s) => sum + (s.priceOverride ?? Number(s.section.price)), 0);
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+      const totalAmount = seats.reduce(
+        (sum, s) => sum + (s.priceOverride ?? Number(s.section.price)),
+        0
+      );
+      const expiresAt = new Date(Date.now() + LOCK_DURATION_MS);
 
       const reservation = await tx.reservation.create({
         data: {
@@ -131,7 +148,7 @@ export async function lockSeatsAction(input: LockSeatsInput): Promise<LockSeatsR
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to lock seats.';
-    const unavailableIds = (err as any)?.unavailableIds || [];
+    const unavailableIds = err instanceof SeatUnavailableError ? err.unavailableIds : [];
     return { success: false, error: message, unavailableIds };
   }
 }
