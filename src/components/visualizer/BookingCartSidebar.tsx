@@ -2,12 +2,12 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { SeatDTO, SectionDTO } from '@/types/venue';
+import { SeatDTO, SectionDTO, PricingTierDTO } from '@/types/venue';
 import { ShoppingCart, Clock, CheckCircle, Ticket, ChevronRight, XCircle } from 'lucide-react';
 
 interface BookingCartSidebarProps {
   sections: SectionDTO[];
-  pricingTiers?: any[];
+  pricingTiers?: PricingTierDTO[];
   eventId: string;
   selectedSeats: SeatDTO[];
   onClearSeat: (seatId: string) => void;

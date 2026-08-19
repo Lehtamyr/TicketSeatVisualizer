@@ -22,8 +22,9 @@ export interface PricingTierDTO {
   name: string;
   color: string;
   basePrice: number;
-  description?: string;
-  salesEndDate?: string;
+  description?: string | null;
+  salesEndDate?: string | Date | null;
+  layoutId?: string | null;
 }
 
 export interface SectionDTO {
@@ -52,6 +53,15 @@ export interface SeatDTO {
   price: number;
 }
 
+export interface VenueLayoutDTO {
+  id?: string;
+  name?: string;
+  canvasWidth?: number;
+  canvasHeight?: number;
+  pricingTiers?: PricingTierDTO[];
+  [key: string]: unknown;
+}
+
 export interface EventDTO {
   id: string;
   title: string;
@@ -62,7 +72,7 @@ export interface EventDTO {
   viewBoxWidth: number;
   viewBoxHeight: number;
   sections: SectionDTO[];
-  layout?: any;
+  layout?: VenueLayoutDTO | null;
 }
 
 export interface SaveLayoutInput {

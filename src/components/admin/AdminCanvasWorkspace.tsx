@@ -586,9 +586,6 @@ export function AdminCanvasWorkspace() {
         pricingTiers,
       };
 
-      // console.log('DEBUG PAYLOAD:', payload);
-      // alert(`Sending sections: ${payload.sections.length}, pricingTiers: ${payload.pricingTiers ? payload.pricingTiers.length : 'UNDEFINED'}, tierId[0]: ${payload.sections[0]?.tierId}`);
-
       const response = await fetch('/api/layouts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

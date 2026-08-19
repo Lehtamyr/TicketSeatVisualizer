@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect, useId, useRef, useMemo } from 'react';
+import Image from 'next/image';
 import { EventDTO, SectionDTO, SeatDTO } from '@/types/venue';
 import { VenueMapCanvas } from '@/components/visualizer/VenueMapCanvas';
 import { SeatGridPicker } from '@/components/visualizer/SeatGridPicker';
@@ -392,7 +393,13 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
         {view === 'map' ? (
           <>
             {/* Full-bleed poster background */}
-            <img src="/img/Home%20sweet%20Loan%20Poster.jpeg" alt="" className="absolute inset-0 w-full h-full object-cover" />
+            <Image
+              src="/img/Home%20sweet%20Loan%20Poster.jpeg"
+              alt="Event background poster"
+              fill
+              priority
+              className="object-cover"
+            />
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
             {/* Venue Map on top */}
             <div className="relative z-10 w-full h-full flex items-center justify-center max-w-5xl mx-auto p-6">
