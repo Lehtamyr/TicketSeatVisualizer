@@ -1,8 +1,10 @@
 'use server';
 
-import { prisma } from '@/lib/prisma';
+import { prisma, TransactionClient } from '@/lib/prisma';
 import { LockSeatsInput, LockSeatsResult } from '@/types/venue';
 import { broadcastSeatUpdate } from '@/lib/seatBroadcaster';
+import { LockSeatsSchema } from '@/lib/schemas';
+import { getOrCreateSessionId } from '@/lib/session';
 
 const LOCK_DURATION_MS = 10 * 60 * 1000; // 10 minutes
 
@@ -14,8 +16,6 @@ class SeatUnavailableError extends Error {
     this.unavailableIds = unavailableIds;
   }
 }
-
-type TransactionClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 
 /**
  * Releases existing pending reservations and their held seats for a given user session.
@@ -47,18 +47,18 @@ async function releasePendingReservations(
 }
 
 export async function lockSeatsAction(input: LockSeatsInput): Promise<LockSeatsResult> {
-  const { eventId, seatIds, userSessionId } = input;
+  const userSessionId = await getOrCreateSessionId(input.userSessionId);
 
   // If seatIds is empty or undefined, release all locks for this session
-  if (!seatIds || !seatIds.length) {
+  if (!input.seatIds || !input.seatIds.length) {
     try {
       const releasedIds = await prisma.$transaction((tx) =>
-        releasePendingReservations(tx, userSessionId, eventId)
+        releasePendingReservations(tx, userSessionId, input.eventId)
       );
 
-      if (releasedIds.length > 0 && eventId) {
+      if (releasedIds.length > 0 && input.eventId) {
         broadcastSeatUpdate({
-          eventId,
+          eventId: input.eventId,
           seatIds: releasedIds,
           status: 'AVAILABLE',
           userSessionId,
@@ -70,6 +70,13 @@ export async function lockSeatsAction(input: LockSeatsInput): Promise<LockSeatsR
       return { success: false, error: 'Failed to clear cart locks.' };
     }
   }
+
+  const parsed = LockSeatsSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || 'Invalid input' };
+  }
+
+  const { eventId, seatIds } = parsed.data;
 
   try {
     const result = await prisma.$transaction(async (tx) => {

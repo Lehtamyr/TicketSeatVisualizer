@@ -4,6 +4,8 @@ import { AdminCanvasWorkspace } from '@/components/admin/AdminCanvasWorkspace';
 import Link from 'next/link';
 import { ArrowLeft, Layers, Loader2 } from 'lucide-react';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Admin Layout Builder — Venue Seat Visualizer',
   description: 'Draw and manage modular venue section shapes with seat auto-generation.',

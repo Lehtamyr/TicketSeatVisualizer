@@ -111,6 +111,7 @@ model Seat {
   reservationSeats ReservationSeat[]
 
   @@unique([sectionId, row, number])
+  @@index([sectionId, status])
 }
 
 model Reservation {
@@ -124,6 +125,9 @@ model Reservation {
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
   seats         ReservationSeat[]
+
+  @@index([status, expiresAt])
+  @@index([userSessionId])
 }
 
 model ReservationSeat {

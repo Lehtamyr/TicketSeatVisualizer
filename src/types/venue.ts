@@ -40,6 +40,10 @@ export interface SectionDTO {
   tierColor?: string;
   totalSeats: number;
   availableSeats: number;
+  rowCount?: number;
+  seatsPerRow?: number;
+  seats?: SeatDTO[];
+  pricingTier?: PricingTierDTO;
 }
 
 export interface SeatDTO {

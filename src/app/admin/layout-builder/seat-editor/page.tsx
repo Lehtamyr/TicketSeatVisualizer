@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Point, ShapeType, SectionGeometry } from '@/types/venue';
+import { Point, ShapeType, SectionGeometry, SectionDTO, SeatDTO } from '@/types/venue';
 import { generateSeatGrid, GeneratedSeat, getRowLabel } from '@/lib/seatGenerator';
 import { renderShapePath, calculateCentroid, calculateBoundingBox } from '@/lib/geometry';
 import { SeatGridPicker } from '@/components/visualizer/SeatGridPicker';
@@ -315,8 +315,8 @@ function SeatEditorWorkspace() {
             <div className="w-full h-full flex flex-col items-center justify-center overflow-hidden">
               <div className="w-full max-w-4xl h-[72vh] flex flex-col bg-[#090d16]/30 border border-subtle rounded-2xl p-4 shadow-2xl relative select-none">
                 <SeatGridPicker
-                  section={selectedSection as any}
-                  seats={selectedSection.seats as any}
+                  section={selectedSection as unknown as SectionDTO}
+                  seats={selectedSection.seats as unknown as SeatDTO[]}
                   selectedIds={new Set()}
                   onToggleSeat={() => { }}
                   adminMode={true}

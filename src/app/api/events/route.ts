@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getEvents } from '@/actions/getEvents';
 import { prisma } from '@/lib/prisma';
+import { CreateEventSchema } from '@/lib/schemas';
+import { parseGeometry } from '@/lib/parseGeometry';
 
 export async function GET() {
   try {
@@ -15,11 +17,16 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { title, description, venueName, startTime, endTime, layoutId } = body;
+    const parsed = CreateEventSchema.safeParse(body);
 
-    if (!title || !venueName || !startTime || !layoutId) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message || 'Invalid event payload' },
+        { status: 400 }
+      );
     }
+
+    const { title, description, venueName, startTime, endTime, layoutId } = parsed.data;
 
     // 1. Fetch layout including its sections and seats
     const layout = await prisma.venueLayout.findUnique({

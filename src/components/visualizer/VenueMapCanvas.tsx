@@ -231,7 +231,7 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
           const tx = Math.min(tooltip.x + 12, vbW - tipW - 8);
           const ty = Math.max(tooltip.y - tipH - 12, 8);
           const grade = getAvailabilityGrade(s);
-          const tierName = s.tierName || (s as any).pricingTier?.name || (
+          const tierName = s.tierName || s.pricingTier?.name || (
             s.price >= 120 ? 'VIP Tier' :
               s.price <= 45 ? 'Economy Tier' :
                 'Standard Tier'
@@ -248,7 +248,7 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
                 {s.name}
               </text>
               {tierName && (
-                <text x={tx + 10} y={ty + 35} fill={s.tierColor ?? (s as any).pricingTier?.color ?? 'var(--text-muted)'} fontSize="9" fontFamily="Inter, sans-serif">
+                <text x={tx + 10} y={ty + 35} fill={s.tierColor ?? s.pricingTier?.color ?? 'var(--text-muted)'} fontSize="9" fontFamily="Inter, sans-serif">
                   {tierName}
                 </text>
               )}

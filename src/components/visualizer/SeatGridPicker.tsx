@@ -51,8 +51,8 @@ export function SeatGridPicker({
     const sourceSeats = (seats && seats.length > 0) ? seats : (
       generateSeatGrid({
         geometry: { ...section.geometry, clipToBoundary: false, disabledSeats: adminMode ? [] : (disabledSeatKeys || []) },
-        rowCount: (section as any).rowCount || 8,
-        seatsPerRow: (section as any).seatsPerRow || 12,
+        rowCount: section.rowCount || 8,
+        seatsPerRow: section.seatsPerRow || 12,
         seatRadius: 7,
         padding: 14,
         sectionId: section.id,
@@ -65,7 +65,7 @@ export function SeatGridPicker({
       id: s.id || `${section.id}-${s.row}-${s.number}`,
       sectionId: s.sectionId || section.id,
       status: s.status || 'AVAILABLE',
-      price: s.price ?? (s as any).priceOverride ?? defaultPrice,
+      price: s.price ?? defaultPrice,
     }));
   }, [section, seats, adminMode, disabledSeatKeys]);
 

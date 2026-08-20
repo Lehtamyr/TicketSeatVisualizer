@@ -2,18 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { saveLayoutAction } from '@/actions/saveLayout';
 import { SaveLayoutInput } from '@/types/venue';
-
-// Helper to safely parse geometry JSON string from SQLite DB
-function parseGeometry(raw: unknown) {
-  if (typeof raw === 'string') {
-    try {
-      return JSON.parse(raw);
-    } catch {
-      // ignore
-    }
-  }
-  return raw;
-}
+import { parseGeometry } from '@/lib/parseGeometry';
 
 export async function GET(request: Request) {
   try {

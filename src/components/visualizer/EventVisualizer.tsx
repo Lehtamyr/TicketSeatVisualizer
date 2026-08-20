@@ -67,15 +67,15 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
       const loaded = await fetchLiveSectionSeats(section.id);
       if (loaded && loaded.length > 0) {
         setSeats(loaded);
-      } else if ((section as any).seats && (section as any).seats.length > 0) {
-        setSeats((section as any).seats);
+      } else if (section.seats && section.seats.length > 0) {
+        setSeats(section.seats);
       } else {
         setSeats([]);
       }
     } catch (err) {
       console.error('Failed to load seats:', err);
-      if ((section as any).seats && (section as any).seats.length > 0) {
-        setSeats((section as any).seats);
+      if (section.seats && section.seats.length > 0) {
+        setSeats(section.seats);
       }
     } finally {
       setLoadingSeats(false);
@@ -295,8 +295,8 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
     if (!selectedSection) return [];
     return generateSeatGrid({
       geometry: { ...selectedSection.geometry, clipToBoundary: false },
-      rowCount: (selectedSection as any).rowCount || 5,
-      seatsPerRow: (selectedSection as any).seatsPerRow || 5,
+      rowCount: selectedSection.rowCount || 5,
+      seatsPerRow: selectedSection.seatsPerRow || 5,
       seatRadius: 7,
       padding: 14,
       sectionId: selectedSection.id,

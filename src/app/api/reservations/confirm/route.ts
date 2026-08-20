@@ -6,27 +6,6 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { reservationId, userSessionId } = body;
 
-    // Direct fallback for Playwright E2E mock reservations (un-mocked in tier1 test)
-    const isTestEnv =
-      process.env.NODE_ENV === 'test' ||
-      request.headers.get('x-test-mode') === 'true' ||
-      process.env.PLAYWRIGHT_TEST === '1';
-
-    if (
-      isTestEnv &&
-      (reservationId === 'res-pending-001' ||
-        (reservationId && reservationId.startsWith('mock-')) ||
-        !reservationId)
-    ) {
-      return NextResponse.json({
-        success: true,
-        data: {
-          id: reservationId || 'res-pending-001',
-          status: 'CONFIRMED',
-        },
-      });
-    }
-
     const result = await confirmBookingAction({ reservationId, userSessionId });
 
     if (result.success) {

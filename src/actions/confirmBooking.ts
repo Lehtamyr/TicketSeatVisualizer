@@ -2,9 +2,17 @@
 
 import { prisma } from '@/lib/prisma';
 import { ConfirmBookingInput, ConfirmBookingResult } from '@/types/venue';
+import { ConfirmBookingSchema } from '@/lib/schemas';
+import { getOrCreateSessionId } from '@/lib/session';
 
 export async function confirmBookingAction(input: ConfirmBookingInput): Promise<ConfirmBookingResult> {
-  const { reservationId, userSessionId } = input;
+  const parsed = ConfirmBookingSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || 'Invalid input' };
+  }
+
+  const { reservationId } = parsed.data;
+  const effectiveSessionId = await getOrCreateSessionId(input.userSessionId);
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -14,7 +22,7 @@ export async function confirmBookingAction(input: ConfirmBookingInput): Promise<
       });
 
       if (!reservation) throw new Error('Reservation not found.');
-      if (reservation.userSessionId !== userSessionId) throw new Error('Unauthorized.');
+      if (reservation.userSessionId !== effectiveSessionId) throw new Error('Unauthorized.');
       if (reservation.status !== 'PENDING') throw new Error('Reservation is not pending.');
       if (reservation.expiresAt < new Date()) throw new Error('Reservation has expired.');
 

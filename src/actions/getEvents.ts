@@ -2,13 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { EventDTO, SectionDTO, SectionGeometry } from '@/types/venue';
-
-function parseGeometry(raw: unknown): SectionGeometry {
-  if (typeof raw === 'string') {
-    try { return JSON.parse(raw) as SectionGeometry; } catch { /* fall through */ }
-  }
-  return raw as SectionGeometry;
-}
+import { parseGeometry } from '@/lib/parseGeometry';
 
 export async function getEvents(): Promise<EventDTO[]> {
   const events = await prisma.event.findMany({

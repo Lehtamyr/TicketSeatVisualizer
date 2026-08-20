@@ -1,11 +1,11 @@
 'use server';
 
 import crypto from 'crypto';
-import { prisma } from '@/lib/prisma';
+import { prisma, TransactionClient } from '@/lib/prisma';
 import { SaveLayoutInput, SectionGeometry } from '@/types/venue';
 import { generateSeatGrid, GeneratedSeat } from '@/lib/seatGenerator';
-
-type TransactionClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+import { parseGeometry } from '@/lib/parseGeometry';
+import { SaveLayoutSchema } from '@/lib/schemas';
 
 interface ProcessedSection {
   name: string;
@@ -30,16 +30,10 @@ interface TierSyncResult {
  */
 function preprocessSections(sections: SaveLayoutInput['sections']): ProcessedSection[] {
   return sections.map((sec) => {
-    const geomObj: SectionGeometry =
-      typeof sec.geometry === 'string'
-        ? (() => {
-            try {
-              return JSON.parse(sec.geometry);
-            } catch {
-              return { shapeType: 'RECTANGLE' as const, points: [] };
-            }
-          })()
-        : sec.geometry || { shapeType: 'RECTANGLE' as const, points: [] };
+    const geomObj: SectionGeometry = (parseGeometry(sec.geometry) as SectionGeometry) || {
+      shapeType: 'RECTANGLE' as const,
+      points: [],
+    };
 
     const isStage = sec.shapeType === 'STAGE' || geomObj?.shapeType === 'STAGE';
     let seatsToCreate = sec.seats as GeneratedSeat[] | undefined;
@@ -275,6 +269,11 @@ export async function saveLayoutAction(
   input: SaveLayoutInput
 ): Promise<{ success: boolean; layoutId?: string; error?: string }> {
   try {
+    const parsed = SaveLayoutSchema.safeParse(input);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message || 'Invalid layout input' };
+    }
+
     const processedSections = preprocessSections(input.sections);
 
     const layoutId = await prisma.$transaction(

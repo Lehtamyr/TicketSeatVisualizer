@@ -35,15 +35,17 @@ async function runCleanup() {
 
 function isAuthorizedCron(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return true; // Allowed in dev/test if secret not configured
+  if (!secret) {
+    // Fail-closed in production, but permit development / test execution
+    const isTestOrDev =
+      process.env.NODE_ENV !== 'production' ||
+      process.env.PLAYWRIGHT_TEST === '1' ||
+      process.env.CI === 'true';
+    return isTestOrDev;
+  }
 
   const authHeader = request.headers.get('authorization');
-  if (authHeader === `Bearer ${secret}`) return true;
-
-  const url = new URL(request.url);
-  if (url.searchParams.get('secret') === secret) return true;
-
-  return false;
+  return authHeader === `Bearer ${secret}`;
 }
 
 // Cron cleanup: expire PENDING reservations & release HELD seats (via GET or POST)
