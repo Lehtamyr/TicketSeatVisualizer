@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { getEvents } from '@/actions/getEvents';
 import { prisma } from '@/lib/prisma';
 import { CreateEventSchema } from '@/lib/schemas';
-import { parseGeometry } from '@/lib/parseGeometry';
 
 export async function GET() {
   try {
