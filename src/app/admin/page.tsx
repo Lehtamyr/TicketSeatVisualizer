@@ -40,6 +40,8 @@ export default function AdminDashboardPage() {
   const [creatingEvent, setCreatingEvent] = useState(false);
   const [createSuccess, setCreateSuccess] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [deleteSuccess, setDeleteSuccess] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const fetchLayouts = async () => {
     try {
@@ -92,18 +94,36 @@ export default function AdminDashboardPage() {
     if (!confirm('Are you sure you want to delete this layout? This will also delete all associated sections and seats.')) {
       return;
     }
+
+    // Save previous state in case of rollback
+    const previousLayouts = [...layouts];
+
+    // 1. Optimistic UI update (disappears instantly from screen)
+    setLayouts((prev) => prev.filter((l) => l.id !== layoutId));
+    setDeleteSuccess('Layout deleted successfully.');
+    setDeleteError(null);
+
+    // Auto-clear success notification after 3 seconds
+    setTimeout(() => {
+      setDeleteSuccess(null);
+    }, 3000);
+
     try {
       const res = await fetch(`/api/layouts?layoutId=${layoutId}`, {
         method: 'DELETE',
       });
-      if (res.ok) {
-        fetchLayouts(); // Refresh layouts list
-      } else {
-        alert('Failed to delete layout.');
+      if (!res.ok) {
+        // Rollback on server failure
+        setLayouts(previousLayouts);
+        setDeleteSuccess(null);
+        setDeleteError('Failed to delete layout from the server.');
       }
     } catch (err) {
       console.error('Failed to delete layout:', err);
-      alert('Failed to delete layout due to a network error.');
+      // Rollback on network error
+      setLayouts(previousLayouts);
+      setDeleteSuccess(null);
+      setDeleteError('Network error while deleting layout.');
     }
   };
 
@@ -209,6 +229,30 @@ export default function AdminDashboardPage() {
             </h2>
             <p className="text-xs text-secondary mt-1">Select and manage modular seating layouts or spawn ticket sale events.</p>
           </div>
+
+          {deleteSuccess && (
+            <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-400 flex items-center justify-between animate-fadeIn">
+              <div className="flex items-center gap-2">
+                <CheckCircle size={14} className="shrink-0" />
+                <span>{deleteSuccess}</span>
+              </div>
+              <button onClick={() => setDeleteSuccess(null)} className="text-emerald-400 hover:text-emerald-300 p-0.5">
+                <X size={13} />
+              </button>
+            </div>
+          )}
+
+          {deleteError && (
+            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400 flex items-center justify-between animate-fadeIn">
+              <div className="flex items-center gap-2">
+                <Info size={14} className="shrink-0" />
+                <span>{deleteError}</span>
+              </div>
+              <button onClick={() => setDeleteError(null)} className="text-red-400 hover:text-red-300 p-0.5">
+                <X size={13} />
+              </button>
+            </div>
+          )}
 
           {loadingLayouts ? (
             <div className="glass rounded-2xl p-12 flex items-center justify-center">
