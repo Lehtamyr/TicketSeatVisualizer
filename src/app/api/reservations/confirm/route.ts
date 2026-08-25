@@ -4,15 +4,22 @@ import { confirmBookingAction } from '@/actions/confirmBooking';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { reservationId, userSessionId } = body;
+    const { reservationId, userSessionId, buyerInfo, paymentMethod } = body;
 
-    const result = await confirmBookingAction({ reservationId, userSessionId });
+    const result = await confirmBookingAction({
+      reservationId,
+      userSessionId,
+      buyerInfo,
+      paymentMethod,
+    });
 
     if (result.success) {
       return NextResponse.json({
         success: true,
         data: {
           id: reservationId,
+          orderId: result.orderId,
+          orderNumber: result.orderNumber,
           status: 'CONFIRMED',
         },
       });

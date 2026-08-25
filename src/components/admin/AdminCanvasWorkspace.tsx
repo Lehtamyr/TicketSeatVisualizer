@@ -408,7 +408,7 @@ export function AdminCanvasWorkspace() {
     }
 
     if (!drawing) return;
-    if (tool === 'rectangle' || tool === 'circle') setRectCurrent(pt);
+    if (tool === 'rectangle' || tool === 'stage' || tool === 'circle') setRectCurrent(pt);
     else if (tool === 'triangle' || tool === 'polygon') {
       setPolyPoints((prev) => {
         if (prev.length === 0) return prev;
@@ -826,6 +826,51 @@ export function AdminCanvasWorkspace() {
                           }
                         }}
                       />
+
+                      {/* Selected Stage Bounding Box CAD Dimension Lines */}
+                      {isSelected && (
+                        <g style={{ pointerEvents: 'none' }}>
+                          <line x1={bbox.minX} y1={bbox.minY - 10} x2={bbox.maxX} y2={bbox.minY - 10} stroke="var(--accent-primary)" strokeWidth="1" strokeDasharray="3 2" />
+                          <text x={(bbox.minX + bbox.maxX) / 2} y={bbox.minY - 14} textAnchor="middle" fill="var(--canvas-text)" fontSize="8.5" fontFamily="JetBrains Mono, monospace" fontWeight="600">
+                            {`w: ${Math.round(bbox.width)}px`}
+                          </text>
+                          <line x1={bbox.maxX + 10} y1={bbox.minY} x2={bbox.maxX + 10} y2={bbox.maxY} stroke="var(--accent-primary)" strokeWidth="1" strokeDasharray="3 2" />
+                          <text x={bbox.maxX + 15} y={(bbox.minY + bbox.maxY) / 2 + 3} textAnchor="start" fill="var(--canvas-text)" fontSize="8.5" fontFamily="JetBrains Mono, monospace" fontWeight="600">
+                            {`h: ${Math.round(bbox.height)}px`}
+                          </text>
+                        </g>
+                      )}
+
+                      {/* Selected Stage Interactive Corner Resize Handles */}
+                      {isSelected && (
+                        <g>
+                          <rect
+                            x={bbox.minX - 5} y={bbox.minY - 5} width="10" height="10"
+                            fill="#38bdf8" stroke="#ffffff" strokeWidth="1.5" rx="2"
+                            style={{ cursor: 'nwse-resize' }}
+                            onMouseDown={(e) => { e.stopPropagation(); setResizingHandle({ sectionId: s.id, handle: 'tl' }); }}
+                          />
+                          <rect
+                            x={bbox.maxX - 5} y={bbox.minY - 5} width="10" height="10"
+                            fill="#38bdf8" stroke="#ffffff" strokeWidth="1.5" rx="2"
+                            style={{ cursor: 'nesw-resize' }}
+                            onMouseDown={(e) => { e.stopPropagation(); setResizingHandle({ sectionId: s.id, handle: 'tr' }); }}
+                          />
+                          <rect
+                            x={bbox.minX - 5} y={bbox.maxY - 5} width="10" height="10"
+                            fill="#38bdf8" stroke="#ffffff" strokeWidth="1.5" rx="2"
+                            style={{ cursor: 'nesw-resize' }}
+                            onMouseDown={(e) => { e.stopPropagation(); setResizingHandle({ sectionId: s.id, handle: 'bl' }); }}
+                          />
+                          <rect
+                            x={bbox.maxX - 5} y={bbox.maxY - 5} width="10" height="10"
+                            fill="#38bdf8" stroke="#ffffff" strokeWidth="1.5" rx="2"
+                            style={{ cursor: 'nwse-resize' }}
+                            onMouseDown={(e) => { e.stopPropagation(); setResizingHandle({ sectionId: s.id, handle: 'br' }); }}
+                          />
+                        </g>
+                      )}
+
                       <text
                         x={centroid.x}
                         y={centroid.y + 4}

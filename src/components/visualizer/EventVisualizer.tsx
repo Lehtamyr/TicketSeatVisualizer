@@ -199,9 +199,12 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
             return prev.map((oldSeat) => {
               const updated: any = seatMap.get(oldSeat.id);
               if (updated) {
+                // If this seat is currently selected locally by the user, keep status as AVAILABLE or locally handled
+                const isLocallySelected = selectedSeatIdsRef.current.has(oldSeat.id);
                 return {
                   ...oldSeat,
                   ...updated,
+                  status: isLocallySelected ? 'AVAILABLE' : updated.status,
                   price: updated.price ?? oldSeat.price,
                 };
               }
@@ -276,16 +279,15 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
             return; // Return early; state change will trigger re-sync for remaining seats
           }
 
-          throw new Error(data.error || 'One or more seats are no longer available.');
+          setLockError(data.error || 'One or more seats are no longer available.');
+          return;
         }
         // Success: update reference
         lastLockedIdsRef.current = currentIds;
       } catch (err: any) {
-        // Revert to the last successfully locked state
-        setSelectedSeatIds(new Set(lastLockedIdsRef.current));
-        setLockError(err.message || 'Selected seats are no longer available.');
+        setLockError(err.message || 'Failed to sync selected seats.');
       }
-    }, 400); // 400ms debounce delay
+    }, 300); // 300ms debounce delay
 
     return () => clearTimeout(timerId);
   }, [selectedSeatIds, view, selectedSection, event.id, sessionId]);
@@ -306,30 +308,42 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
   const selectedSeatObjects = Array.from(globalCart.values());
 
   const activeTiers = useMemo(() => {
-    let baseTiers: any[] = [];
-    
-    if (event.layout?.pricingTiers && event.layout.pricingTiers.length > 0) {
-      baseTiers = [...event.layout.pricingTiers];
-      
-      // If there are still sections that don't belong to any of the formal tiers, group them into a fallback tier.
-      const sectionsWithoutTiers = event.sections.filter(sec => 
-        sec.shapeType !== 'STAGE' && !baseTiers.find(t => t.id === sec.tierId || t.name === sec.tierName)
+    const nonStageSections = (event.sections || []).filter(
+      (sec) => sec.shapeType !== 'STAGE' && sec.geometry?.shapeType !== 'STAGE'
+    );
+
+    if (nonStageSections.length === 0) return [];
+
+    const layoutTiers = event.layout?.pricingTiers || [];
+    const usedTierIds = new Set<string>();
+    const usedTierNames = new Set<string>();
+    const sectionsWithoutFormalTier: typeof nonStageSections = [];
+
+    nonStageSections.forEach((sec) => {
+      const matchedTier = layoutTiers.find(
+        (t: any) =>
+          (sec.tierId && t.id === sec.tierId) ||
+          ((sec as any).pricingTierId && t.id === (sec as any).pricingTierId) ||
+          (sec.tierName && t.name === sec.tierName)
       );
-      if (sectionsWithoutTiers.length > 0) {
-        const lowestPrice = Math.min(...sectionsWithoutTiers.map(s => s.price || 0));
-        baseTiers.push({
-          id: 'tier-economy-fallback',
-          name: 'Standard Tier',
-          color: 'var(--text-muted)',
-          basePrice: lowestPrice,
-          description: 'Standard event seating.',
-        });
+
+      if (matchedTier) {
+        usedTierIds.add(matchedTier.id);
+        usedTierNames.add(matchedTier.name);
+      } else {
+        sectionsWithoutFormalTier.push(sec);
       }
-    } else {
-      // Robust Fallback Logic: group sections by distinct prices
-      const priceGroups = new Map<number, any[]>();
-      event.sections.forEach(sec => {
-        if (sec.shapeType === 'STAGE') return;
+    });
+
+    // Retain only layout tiers that are actively used by at least one section
+    const inUseTiers: any[] = layoutTiers
+      .filter((t: any) => usedTierIds.has(t.id) || usedTierNames.has(t.name))
+      .map((t: any) => ({ ...t }));
+
+    // Group remaining sections without formal tiers by distinct price
+    if (sectionsWithoutFormalTier.length > 0) {
+      const priceGroups = new Map<number, typeof nonStageSections>();
+      sectionsWithoutFormalTier.forEach((sec) => {
         const p = sec.price || 0;
         if (!priceGroups.has(p)) priceGroups.set(p, []);
         priceGroups.get(p)!.push(sec);
@@ -337,22 +351,18 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
 
       priceGroups.forEach((secs, price) => {
         const sample = secs[0];
-        let name = sample.tierName;
-        if (!name) {
-          name = `${sample.name || 'Standard'} Tier`;
-        }
-        baseTiers.push({
-          id: sample.tierId || `tier-fallback-${price}`,
+        const name = sample.tierName || `${sample.name || 'Standard'} Tier`;
+        inUseTiers.push({
+          id: sample.tierId || (sample as any).pricingTierId || `tier-fallback-${price}`,
           name: name,
-          color: sample.tierColor || sample.color,
+          color: sample.tierColor || sample.color || 'var(--accent-primary)',
           basePrice: price,
           description: `Seating covering the ${name} areas.`,
         });
       });
     }
 
-    baseTiers.sort((a, b) => b.basePrice - a.basePrice);
-    return baseTiers;
+    return inUseTiers.sort((a, b) => b.basePrice - a.basePrice);
   }, [event]);
 
   return (
@@ -534,12 +544,18 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
           )}
           <div className="glass p-6 rounded-2xl border border-subtle">
             <h2 className="text-lg font-bold mb-3 text-primary">Terms & Conditions</h2>
-            <ul className="text-sm text-secondary list-disc pl-5 space-y-2">
-              <li>Tickets are strictly non-refundable and non-transferable.</li>
-              <li>Please arrive at least 30 minutes before the event starts.</li>
-              <li>Outside food and drinks are prohibited inside the venue.</li>
-              <li>Flash photography is strictly prohibited.</li>
-            </ul>
+            {event.termsAndConditions ? (
+              <div className="text-sm text-secondary whitespace-pre-line leading-relaxed">
+                {event.termsAndConditions}
+              </div>
+            ) : (
+              <ul className="text-sm text-secondary list-disc pl-5 space-y-2">
+                <li>Tickets are strictly non-refundable and non-transferable.</li>
+                <li>Please arrive at least 30 minutes before the event starts.</li>
+                <li>Outside food and drinks are prohibited inside the venue.</li>
+                <li>Flash photography is strictly prohibited.</li>
+              </ul>
+            )}
           </div>
         </div>
 
@@ -550,6 +566,7 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
               sections={event.sections}
               pricingTiers={event.layout?.pricingTiers}
               eventId={event.id}
+              termsAndConditions={event.termsAndConditions}
               selectedSeats={selectedSeatObjects}
               onClearSeat={handleClearSeat}
               onBookingComplete={handleBookingComplete}

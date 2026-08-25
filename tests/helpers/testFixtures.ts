@@ -515,6 +515,8 @@ export const mockSaveLayoutInput: SaveLayoutInput = {
       },
       price: 75.00,
       color: '#3B82F6',
+      rowCount: 1,
+      seatsPerRow: 3,
       seats: [
         { row: 'A', number: 1, x: 100, y: 100 },
         { row: 'A', number: 2, x: 130, y: 100 },

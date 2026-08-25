@@ -123,6 +123,15 @@ test.describe('R1. Modular Section Map Visualizer E2E Tests', () => {
 
 test.describe('R2. Interactive Seat Picker & Booking Flow E2E Tests', () => {
   test.beforeEach(async ({ page }) => {
+    // Intercept Next.js Server Actions and abort them to force the component to fall back to the mockSeatsRectangle above.
+    await page.route('**/*', async (route, request) => {
+      if (request.method() === 'POST' && await request.headerValue('Next-Action')) {
+        await route.abort('failed');
+      } else {
+        await route.fallback();
+      }
+    });
+
     await page.route(/\/api\/events(\/|$|\?)/, async (route) => {
       await route.fulfill({
         status: 200,
@@ -135,21 +144,18 @@ test.describe('R2. Interactive Seat Picker & Booking Flow E2E Tests', () => {
       });
     });
 
-    // Intercept Next.js Server Actions and abort them to force the component to fall back to the mockSeatsRectangle above.
-    await page.route('**/*', async (route, request) => {
-      if (request.method() === 'POST' && await request.headerValue('Next-Action')) {
-        await route.abort('failed');
-      } else {
-        await route.fallback();
-      }
-    });
-
     // Mock the locking and confirming API routes so tests don't clash over the real database
     await page.route(/\/api\/reservations\/lock/, async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ success: true, data: { reservationId: 'res-mock-123', expiresAt: new Date(Date.now() + 10 * 60000).toISOString() } }),
+        body: JSON.stringify({
+          success: true,
+          data: {
+            reservationId: 'res-mock-123',
+            expiresAt: new Date(Date.now() + 10 * 60000).toISOString(),
+          },
+        }),
       });
     });
 
@@ -251,10 +257,10 @@ test.describe('R2. Interactive Seat Picker & Booking Flow E2E Tests', () => {
     const checkoutBtn = page.locator('[data-testid="checkout-button"], button:has-text("Proceed to Checkout")');
     await checkoutBtn.click();
 
-    // Verify confirmation modal
+    // Verify confirmation modal (Modal 1)
     const confirmationModal = page.locator('[data-testid="booking-confirmation-modal"], .checkout-success');
     await expect(confirmationModal).toBeVisible();
-    await expect(confirmationModal).toContainText(/Reservation Confirmed|Booking Successful/i);
+    await expect(confirmationModal).toContainText(/Konfirmasi Pemesanan Tiket|Reservation Confirmed|Booking Successful/i);
   });
 });
 

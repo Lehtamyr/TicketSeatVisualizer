@@ -1,5 +1,8 @@
 export interface Point { x: number; y: number; }
 export type ShapeType = 'RECTANGLE' | 'SQUARE' | 'TRIANGLE' | 'POLYGON' | 'CIRCLE' | 'STAGE';
+export type SeatStatus = 'AVAILABLE' | 'HELD' | 'RESERVED' | 'BLOCKED';
+export type ReservationStatus = 'PENDING' | 'CONFIRMED' | 'EXPIRED' | 'CANCELLED';
+export type PaymentMethodType = 'QRIS' | 'BANK_JAKARTA_VA' | 'BCA_VA';
 
 export interface SectionGeometry {
   shapeType: ShapeType;
@@ -15,6 +18,8 @@ export interface SectionGeometry {
   rowConfigs?: { row: string; seatCount: number }[];
   clipToBoundary?: boolean;
   disabledSeats?: string[];
+  center?: Point;
+  radius?: number;
 }
 
 export interface PricingTierDTO {
@@ -71,6 +76,7 @@ export interface EventDTO {
   title: string;
   description?: string | null;
   venueName: string;
+  termsAndConditions?: string | null;
   startTime: string;
   endTime?: string | null;
   viewBoxWidth: number;
@@ -90,7 +96,7 @@ export interface SaveLayoutInput {
     code: string;
     shapeType: ShapeType;
     geometry: SectionGeometry;
-    tierId?: string; // Replaces raw price and color, though we can still send them as fallback
+    tierId?: string;
     price: number;
     color: string;
     rowCount: number;
@@ -123,10 +129,22 @@ export interface LockSeatsResult {
 
 export interface ConfirmBookingInput {
   reservationId: string;
-  userSessionId: string;
+  userSessionId?: string;
+  buyerInfo?: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phoneNumber?: string;
+    dialCode?: string;
+    identityType?: string;
+    identityNumber?: string;
+  };
+  paymentMethod?: 'QRIS' | 'BANK_JAKARTA_VA' | 'BCA_VA';
 }
 
 export interface ConfirmBookingResult {
   success: boolean;
+  orderId?: string;
+  orderNumber?: string;
   error?: string;
 }

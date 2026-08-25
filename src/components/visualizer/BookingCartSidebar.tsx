@@ -1,35 +1,46 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { SeatDTO, SectionDTO, PricingTierDTO } from '@/types/venue';
 import { ShoppingCart, Clock, CheckCircle, Ticket, ChevronRight, XCircle } from 'lucide-react';
+
+const emptySubscribe = () => () => {};
 
 interface BookingCartSidebarProps {
   sections: SectionDTO[];
   pricingTiers?: PricingTierDTO[];
   eventId: string;
+  termsAndConditions?: string | null;
   selectedSeats: SeatDTO[];
   onClearSeat: (seatId: string) => void;
   onBookingComplete: () => void;
   userSessionId: string;
 }
 
-type CartState = 'idle' | 'checking_out' | 'confirmed' | 'error';
+type CartState = 'idle' | 'confirming_order' | 'reviewing_tnc' | 'checking_out' | 'confirmed' | 'error';
 
 export function BookingCartSidebar({
   sections,
   pricingTiers,
   eventId,
+  termsAndConditions,
   selectedSeats,
   onClearSeat,
   onBookingComplete,
   userSessionId,
 }: BookingCartSidebarProps) {
   const router = useRouter();
+  const mounted = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
   const [cartState, setCartState] = useState<CartState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState<number>(600); // 10 minutes
+  const [pendingReservationId, setPendingReservationId] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const totalPrice = selectedSeats.reduce(
@@ -70,7 +81,8 @@ export function BookingCartSidebar({
     };
   }, [selectedSeats.length, cartState]);
 
-  const handleCheckout = async () => {
+  // Step 1: User clicks "Proceed to Checkout" -> Lock seats & Open Confirmation Modal
+  const handleInitiateCheckout = async () => {
     if (selectedSeats.length === 0) return;
     const now = new Date();
     if (pricingTiers) {
@@ -91,7 +103,7 @@ export function BookingCartSidebar({
     setError(null);
 
     try {
-      // 1. Lock seats via HTTP API so E2E test intercepts work
+      // 1. Lock seats via HTTP API
       const lockResp = await fetch('/api/reservations/lock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -104,45 +116,41 @@ export function BookingCartSidebar({
       const lockResult = await lockResp.json();
 
       if (!lockResp.ok || !lockResult.success) {
+        // If reservationId is already held or returned in payload, we can proceed
+        if (lockResult.reservationId || lockResult.data?.reservationId) {
+          const resId = lockResult.reservationId || lockResult.data?.reservationId;
+          setPendingReservationId(resId);
+          setCartState('confirming_order');
+          return;
+        }
         setCartState('error');
         setError(lockResult.error ?? 'Failed to reserve seats.');
         return;
       }
 
-      // Handle direct, nested, and fallback reservation ID formats safely
       const resId = lockResult.reservationId || lockResult.data?.reservationId || lockResult.id || 'res-pending-001';
+      setPendingReservationId(resId);
 
-      // 2. Confirm booking via HTTP API
-      const confirmResp = await fetch('/api/reservations/confirm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          reservationId: resId,
-          userSessionId,
-          seatIds: selectedSeats.map((s) => s.id), // passed for E2E mock handlers expectation
-        }),
-      });
-      const confirmResult = await confirmResp.json();
-
-      if (confirmResp.ok && (confirmResult.success || confirmResult.data)) {
-        setCartState('confirmed');
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-        }
-        setTimeout(() => {
-          onBookingComplete();
-          setCartState('idle');
-          router.push('/');
-        }, 1000);
-      } else {
-        setCartState('error');
-        setError(confirmResult.error ?? 'Failed to confirm booking.');
-      }
+      // Step 2: Open Confirmation Modal (Modal 1)
+      setCartState('confirming_order');
     } catch (err) {
       setCartState('error');
       setError('Checkout request failed.');
     }
+  };
+
+  // Step 2 -> Step 3: User confirms order -> Open Terms & Conditions Modal (Modal 2)
+  const handleConfirmOrder = () => {
+    setCartState('reviewing_tnc');
+  };
+
+  // Step 3 -> Navigation: User agrees to TnC -> Navigate to Checkout Page
+  const handleAgreeAndProceed = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    router.push(`/events/${eventId}/checkout?reservationId=${pendingReservationId || ''}`);
   };
 
   const formatTime = (seconds: number) => {
@@ -263,10 +271,10 @@ export function BookingCartSidebar({
         {cartState === 'idle' || cartState === 'error' ? (
           <button
             data-testid="checkout-button"
-            onClick={handleCheckout}
+            onClick={handleInitiateCheckout}
             disabled={selectedSeats.length === 0}
             className="w-full py-3 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2
-              bg-accent hover:bg-accent-hover text-secondary disabled:opacity-30 disabled:cursor-not-allowed
+              bg-accent hover:bg-accent-hover text-secondary disabled:opacity-30 disabled:cursor-not-allowed shadow-md
                 "
           >
             Proceed to Checkout
@@ -278,6 +286,107 @@ export function BookingCartSidebar({
           </button>
         ) : null}
       </div>
+
+      {/* Modal 1: User Order Confirmation Modal (Full-screen overlay & centered at document root) */}
+      {mounted && cartState === 'confirming_order' && createPortal(
+        <div className="fixed inset-0 bg-black/65 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
+          <div data-testid="booking-confirmation-modal" className="bg-secondary border border-subtle rounded-2xl shadow-2xl p-6 relative max-w-md w-full animate-zoom-in text-primary">
+            <h3 className="text-base font-bold text-primary mb-1 flex items-center gap-2">
+              <ShoppingCart size={18} className="text-accent" />
+              Konfirmasi Pemesanan Tiket
+            </h3>
+            <p className="text-xs text-secondary mb-4">
+              Periksa kembali rincian tiket yang Anda pilih sebelum melanjutkan ke pengisian data pembeli.
+            </p>
+
+            <div className="bg-primary border border-subtle rounded-xl p-3.5 mb-4 max-h-48 overflow-y-auto flex flex-col gap-2">
+              {selectedSeats.map((seat) => {
+                const sec = sections.find((s) => s.id === seat.sectionId);
+                const seatPrice = typeof seat.price === 'number' && !isNaN(seat.price) ? seat.price : Number(seat.price) || sec?.price || 0;
+                return (
+                  <div key={seat.id} className="flex justify-between items-center text-xs">
+                    <span className="font-semibold text-primary">
+                      {sec ? `${sec.name} - ` : ''}Row {seat.row}, Seat #{seat.number}
+                    </span>
+                    <span className="font-mono text-secondary">Rp {seatPrice.toLocaleString('id-ID')}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="border-t border-subtle pt-3 mb-6 flex justify-between items-center">
+              <span className="text-xs font-semibold text-secondary">Total Pembayaran ({selectedSeats.length} Tiket)</span>
+              <span className="text-base font-bold text-accent font-mono">Rp {totalPrice.toLocaleString('id-ID')}</span>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setCartState('idle')}
+                className="flex-1 py-2.5 rounded-xl border border-subtle text-xs font-semibold text-secondary hover:bg-primary transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmOrder}
+                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-hover text-white text-xs font-semibold shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                Ya, Lanjutkan
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal 2: Terms & Conditions (TnC) Information Modal */}
+      {mounted && cartState === 'reviewing_tnc' && createPortal(
+        <div className="fixed inset-0 bg-black/65 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
+          <div className="bg-secondary border border-subtle rounded-2xl shadow-2xl p-6 relative max-w-lg w-full animate-zoom-in text-primary">
+            <h3 className="text-base font-bold text-primary mb-1 flex items-center gap-2">
+              <Ticket size={18} className="text-accent" />
+              Syarat & Ketentuan Event
+            </h3>
+            <p className="text-xs text-secondary mb-4">
+              Harap membaca dan memahami ketentuan yang berlaku untuk event ini sebelum melakukan pembayaran.
+            </p>
+
+            <div className="bg-primary border border-subtle rounded-xl p-4 mb-6 max-h-64 overflow-y-auto text-xs text-primary whitespace-pre-line leading-relaxed font-sans">
+              {termsAndConditions ? (
+                termsAndConditions
+              ) : (
+                <>
+                  1. Tiket yang sudah dibeli bersifat Non-Refundable (tidak dapat dikembalikan atau ditukar).{'\n'}
+                  2. Pembeli wajib menunjukkan kartu identitas resmi yang valid (KTP/Passport) sesuai nama pemesan saat penukaran tiket.{'\n'}
+                  3. Pengunjung wajib mematuhi seluruh protokol keamanan dan tata tertib venue acara.{'\n'}
+                  4. Dilarang membawa senjata, zat terlarang, alkohol, dan kamera profesional ke dalam area konser.
+                </>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setCartState('confirming_order')}
+                className="py-2.5 px-4 rounded-xl border border-subtle text-xs font-semibold text-secondary hover:bg-primary transition-colors cursor-pointer"
+              >
+                Kembali
+              </button>
+              <button
+                type="button"
+                onClick={handleAgreeAndProceed}
+                className="flex-1 py-2.5 rounded-xl bg-accent hover:bg-accent-hover text-white text-xs font-semibold shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                Saya Setuju & Lanjut ke Pembayaran
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

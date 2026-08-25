@@ -35,6 +35,7 @@ export default function AdminDashboardPage() {
   const [eventTitle, setEventTitle] = useState('');
   const [eventDescription, setEventDescription] = useState('');
   const [venueName, setVenueName] = useState('');
+  const [termsAndConditions, setTermsAndConditions] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [creatingEvent, setCreatingEvent] = useState(false);
@@ -127,11 +128,54 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!confirm('Are you sure you want to delete this event? This will permanently delete the event and its seating/reservation data.')) {
+      return;
+    }
+
+    // Save previous state in case of rollback
+    const previousEvents = [...events];
+
+    // 1. Optimistic UI update
+    setEvents((prev) => prev.filter((e) => e.id !== eventId));
+    setDeleteSuccess('Event deleted successfully.');
+    setDeleteError(null);
+
+    // Auto-clear success notification after 3 seconds
+    setTimeout(() => {
+      setDeleteSuccess(null);
+    }, 3000);
+
+    try {
+      const res = await fetch(`/api/events?eventId=${eventId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        // Rollback on server failure
+        setEvents(previousEvents);
+        setDeleteSuccess(null);
+        setDeleteError('Failed to delete event from the server.');
+      }
+    } catch (err) {
+      console.error('Failed to delete event:', err);
+      // Rollback on network error
+      setEvents(previousEvents);
+      setDeleteSuccess(null);
+      setDeleteError('Network error while deleting event.');
+    }
+  };
+
   const handleOpenCreateEvent = (layout: LayoutItem) => {
     setSelectedLayout(layout);
     setEventTitle(`${layout.name} Event`);
     setEventDescription('');
     setVenueName('Main Arena Stadium');
+    setTermsAndConditions(
+      '1. Tiket yang sudah dibeli tidak dapat ditukar, dibatalkan, atau diuangkan kembali (Non-Refundable).\n' +
+      '2. Pembeli tiket wajib membawa kartu identitas asli (KTP/Passport) yang sesuai dengan nama pada saat pemesanan saat penukaran wristband/masuk venue.\n' +
+      '3. Penyelenggara berhak menolak akses masuk bagi pengunjung yang tidak mematuhi protokol keamanan atau membawa barang terlarang.\n' +
+      '4. Dilarang membawa kamera profesional, senjata tajam, alkohol, dan obat-obatan terlarang ke dalam area venue.'
+    );
     // Default to tomorrow start time and +3 hours end time
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -152,6 +196,11 @@ export default function AdminDashboardPage() {
     e.preventDefault();
     if (!selectedLayout) return;
 
+    if (!termsAndConditions.trim()) {
+      setCreateError('Terms & Conditions are required for every event.');
+      return;
+    }
+
     if (endTime && new Date(endTime) <= new Date(startTime)) {
       setCreateError('End date & time must be after the start date & time.');
       return;
@@ -169,6 +218,7 @@ export default function AdminDashboardPage() {
           title: eventTitle,
           description: eventDescription,
           venueName,
+          termsAndConditions: termsAndConditions.trim(),
           startTime: new Date(startTime).toISOString(),
           endTime: endTime ? new Date(endTime).toISOString() : null,
           layoutId: selectedLayout.id,
@@ -347,9 +397,19 @@ export default function AdminDashboardPage() {
                 const pct = total > 0 ? Math.round((available / total) * 100) : 0;
 
                 return (
-                  <div key={e.id} className="glass rounded-2xl p-4 border border-subtle flex items-center justify-between gap-4">
+                  <div key={e.id} className="glass rounded-2xl p-4 border border-subtle flex items-center justify-between gap-4 group/eventcard">
                     <div className="min-w-0 flex-1">
-                      <h3 className="text-xs font-semibold text-primary truncate">{e.title}</h3>
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="text-xs font-semibold text-primary truncate flex-1">{e.title}</h3>
+                        <button
+                          onClick={() => handleDeleteEvent(e.id)}
+                          className="text-muted hover:text-accent-hover p-1 rounded transition-colors opacity-0 group-hover/eventcard:opacity-100 focus:opacity-100"
+                          title="Delete Event"
+                          aria-label="Delete Event"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                       <p className="text-[10px] text-secondary mt-0.5 truncate">{e.venueName}</p>
                       <div className="flex items-center gap-3 mt-3 text-[10px] text-muted flex-wrap">
                         <span>
@@ -457,6 +517,21 @@ export default function AdminDashboardPage() {
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  Terms & Conditions (TnC) <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  rows={4}
+                  required
+                  value={termsAndConditions}
+                  onChange={(e) => setTermsAndConditions(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all resize-y font-mono leading-relaxed"
+                  placeholder="Enter event terms and conditions..."
+                />
+                <p className="text-[10px] text-slate-600 mt-1">This will be shown to buyers in the checkout confirmation modal.</p>
               </div>
 
               {createError && (

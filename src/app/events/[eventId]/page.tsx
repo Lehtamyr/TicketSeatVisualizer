@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { EventDTO } from '@/types/venue';
 import { EventVisualizer } from '@/components/visualizer/EventVisualizer';
+import { CheckoutJourneyTracker } from '@/components/checkout/CheckoutJourneyTracker';
 import Link from 'next/link';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 
@@ -138,6 +139,9 @@ export default function EventPage() {
           }) : ''}
         </div>
       </header>
+
+      {/* Step 1: Pilih Kursi Journey Tracker */}
+      <CheckoutJourneyTracker currentStep={1} />
 
       {/* Main visualizer container */}
       <main className="flex-1 overflow-hidden">

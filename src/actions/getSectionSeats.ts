@@ -21,8 +21,8 @@ export async function getSectionSeats(sectionId: string): Promise<SeatDTO[]> {
   });
 
   if (expiredReservations.length > 0) {
-    const expiredIds = expiredReservations.map((r) => r.id);
-    const seatIds = expiredReservations.flatMap((r) => r.seats.map((rs) => rs.seatId));
+    const expiredIds = Array.from(new Set(expiredReservations.map((r) => r.id))).sort();
+    const seatIds = Array.from(new Set(expiredReservations.flatMap((r) => r.seats.map((rs) => rs.seatId)))).sort();
 
     await prisma.$transaction([
       prisma.reservation.updateMany({

@@ -78,6 +78,7 @@ export async function getEventById(eventId: string): Promise<EventDTO | null> {
     title: event.title,
     description: event.description,
     venueName: event.venueName,
+    termsAndConditions: event.termsAndConditions,
     startTime: event.startTime.toISOString(),
     endTime: event.endTime?.toISOString() ?? null,
     viewBoxWidth: event.viewBoxWidth,

@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { title, description, venueName, startTime, endTime, layoutId } = parsed.data;
+    const { title, description, venueName, termsAndConditions, startTime, endTime, layoutId } = parsed.data;
 
     // 1. Fetch layout including its sections and seats
     const layout = await prisma.venueLayout.findUnique({
@@ -50,6 +50,7 @@ export async function POST(request: Request) {
           title,
           description: description?.trim() || null,
           venueName,
+          termsAndConditions: termsAndConditions.trim(),
           startTime: new Date(startTime),
           endTime: endTime ? new Date(endTime) : null,
           layoutId,
@@ -109,3 +110,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const url = new URL(request.url);
+    const eventId = url.searchParams.get('eventId');
+
+    if (!eventId) {
+      return NextResponse.json({ error: 'Missing eventId parameter' }, { status: 400 });
+    }
+
+    await prisma.event.delete({
+      where: { id: eventId },
+    });
+
+    return NextResponse.json({ success: true, message: 'Event deleted successfully' });
+  } catch (err) {
+    console.error('[api/events] DELETE error:', err);
+    return NextResponse.json({ error: 'Failed to delete event' }, { status: 500 });
+  }
+}
+

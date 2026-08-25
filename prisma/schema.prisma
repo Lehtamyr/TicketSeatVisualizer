@@ -30,46 +30,60 @@ enum ReservationStatus {
   CANCELLED
 }
 
+enum PaymentMethod {
+  QRIS
+  BANK_JAKARTA_VA
+  BCA_VA
+}
+
+enum OrderStatus {
+  COMPLETED
+  REFUNDED
+  FAILED
+}
+
 model Event {
-  id            String        @id @default(uuid())
-  title         String
-  description   String?
-  venueName     String
-  startTime     DateTime
-  endTime       DateTime?
-  viewBoxWidth  Float         @default(1200)
-  viewBoxHeight Float         @default(800)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  layoutId      String?
-  layout        VenueLayout?  @relation(fields: [layoutId], references: [id])
-  sections      Section[]
-  reservations  Reservation[]
+  id                 String        @id @default(uuid())
+  title              String
+  description        String?
+  venueName          String
+  termsAndConditions String?
+  startTime          DateTime
+  endTime            DateTime?
+  viewBoxWidth       Float         @default(1200)
+  viewBoxHeight      Float         @default(800)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  layoutId           String?
+  layout             VenueLayout?  @relation(fields: [layoutId], references: [id])
+  sections           Section[]
+  reservations       Reservation[]
+  orders             Order[]
 }
 
 model VenueLayout {
-  id           String    @id @default(uuid())
+  id           String        @id @default(uuid())
   name         String
-  canvasWidth  Float     @default(1200)
-  canvasHeight Float     @default(800)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  canvasWidth  Float         @default(1200)
+  canvasHeight Float         @default(800)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   sections     Section[]
   events       Event[]
   pricingTiers PricingTier[]
 }
 
 model PricingTier {
-  id        String       @id @default(uuid())
-  layoutId  String?
-  layout    VenueLayout? @relation(fields: [layoutId], references: [id], onDelete: Cascade)
+  id           String       @id @default(uuid())
+  layoutId     String?
+  layout       VenueLayout? @relation(fields: [layoutId], references: [id], onDelete: Cascade)
   name         String
   color        String
   basePrice    Float
   description  String?
   salesEndDate DateTime?
   sections     Section[]
-  seats     Seat[]
+  seats        Seat[]
 }
 
 model Section {
@@ -81,7 +95,7 @@ model Section {
   name          String
   code          String
   shapeType     ShapeType
-  geometry      String       // JSON stored as string in SQLite
+  geometry      String       // JSON stored as string in PostgreSQL
   pricingTierId String?
   pricingTier   PricingTier? @relation(fields: [pricingTierId], references: [id], onDelete: SetNull)
   price         Float        @default(50.00)
@@ -109,6 +123,7 @@ model Seat {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   reservationSeats ReservationSeat[]
+  orderItems       OrderItem[]
 
   @@unique([sectionId, row, number])
   @@index([sectionId, status])
@@ -125,6 +140,7 @@ model Reservation {
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
   seats         ReservationSeat[]
+  order         Order?
 
   @@index([status, expiresAt])
   @@index([userSessionId])
@@ -140,4 +156,47 @@ model ReservationSeat {
   createdAt     DateTime    @default(now())
 
   @@unique([reservationId, seatId])
+}
+
+model Order {
+  id             String        @id @default(uuid())
+  orderNumber    String        @unique
+  eventId        String
+  event          Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  reservationId  String?       @unique
+  reservation    Reservation?  @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  userSessionId  String
+  buyerFirstName String
+  buyerLastName  String
+  buyerEmail     String
+  buyerPhone     String
+  buyerIdType    String        @default("KTP")
+  buyerIdNumber  String
+  paymentMethod  PaymentMethod @default(QRIS)
+  totalAmount    Float
+  status         OrderStatus   @default(COMPLETED)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  items          OrderItem[]
+
+  @@index([userSessionId])
+  @@index([buyerEmail])
+  @@index([eventId, status])
+}
+
+model OrderItem {
+  id          String   @id @default(uuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  seatId      String
+  seat        Seat     @relation(fields: [seatId], references: [id], onDelete: Cascade)
+  seatRow     String
+  seatNumber  Int
+  sectionName String
+  tierName    String?
+  pricePaid   Float
+  createdAt   DateTime @default(now())
+
+  @@index([orderId])
+  @@index([seatId])
 }
