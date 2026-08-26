@@ -56,12 +56,12 @@ export const CreateEventSchema = z.object({
 });
 
 export const BuyerCredentialsSchema = z.object({
-  firstName: z.string().min(1, 'First name is required').max(100).trim(),
-  lastName: z.string().min(1, 'Last name is required').max(100).trim(),
-  email: z.string().email('Invalid email address').max(200).trim(),
-  phoneCountryCode: z.string().min(1, 'Country code is required').max(10),
-  phoneNumber: z.string().min(5, 'Valid phone number is required').max(20).trim(),
-  idNumber: z.string().min(4, 'ID number is required').max(50).trim(),
+  firstName: z.string().trim().min(1, 'First name is required').max(100),
+  lastName: z.string().trim().min(1, 'Last name is required').max(100),
+  email: z.string().trim().email('Invalid email address').max(200),
+  phoneCountryCode: z.string().trim().min(1, 'Country code is required').max(10),
+  phoneNumber: z.string().trim().min(5, 'Valid phone number is required').max(20),
+  idNumber: z.string().trim().min(4, 'ID number is required').max(50),
   birthDay: z.number().int().min(1).max(31),
   birthMonth: z.number().int().min(1).max(12),
   birthYear: z.number().int().min(1900).max(new Date().getFullYear()),
