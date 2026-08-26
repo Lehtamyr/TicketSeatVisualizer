@@ -190,3 +190,17 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # ─────────────────────────────────────────────────────────────
+  # Stage 4: Deploy to Vercel (Only runs if ALL tests pass)
+  # ─────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to Vercel
+    needs: [code-quality, e2e-tests]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Trigger Vercel Production Deployment
+        run: |
+          echo "All tests passed! Triggering Vercel deployment..."
+          curl -s -f -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}"
