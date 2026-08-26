@@ -115,20 +115,6 @@ async function main() {
   await prisma.venueLayout.deleteMany();
   await prisma.pricingTier.deleteMany();
 
-  // 2. Create Pricing Tiers
-  const vipTier = await prisma.pricingTier.create({
-    data: { name: 'VIP', color: '#EAB308', basePrice: 150.00 },
-  });
-  const premiumTier = await prisma.pricingTier.create({
-    data: { name: 'Premium', color: '#3B82F6', basePrice: 100.00 },
-  });
-  const standardTier = await prisma.pricingTier.create({
-    data: { name: 'Standard', color: '#10B981', basePrice: 60.00 },
-  });
-  const economyTier = await prisma.pricingTier.create({
-    data: { name: 'Economy', color: '#6B7280', basePrice: 35.00 },
-  });
-
   // ----------------------------------------------------
   // VENUE 1: Grand Stadium (Canvas 1200 x 800)
   // ----------------------------------------------------
@@ -138,6 +124,20 @@ async function main() {
       canvasWidth: 1200,
       canvasHeight: 800,
     },
+  });
+
+  // 2. Create Pricing Tiers for Stadium Layout
+  const vipTier = await prisma.pricingTier.create({
+    data: { layoutId: stadiumLayout.id, name: 'VIP', color: '#EAB308', basePrice: 150.00 },
+  });
+  const premiumTier = await prisma.pricingTier.create({
+    data: { layoutId: stadiumLayout.id, name: 'Premium', color: '#3B82F6', basePrice: 100.00 },
+  });
+  const standardTier = await prisma.pricingTier.create({
+    data: { layoutId: stadiumLayout.id, name: 'Standard', color: '#10B981', basePrice: 60.00 },
+  });
+  const economyTier = await prisma.pricingTier.create({
+    data: { layoutId: stadiumLayout.id, name: 'Economy', color: '#6B7280', basePrice: 35.00 },
   });
 
   const stadiumEvent = await prisma.event.create({

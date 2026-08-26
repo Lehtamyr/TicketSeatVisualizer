@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.github
+playwright-report
+test-results
+coverage
+graphify-out
+tests
+*.md
+.env*
+!.env.example
+SYSTEM_DOCUMENTATION.md

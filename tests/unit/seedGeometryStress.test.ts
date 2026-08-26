@@ -244,7 +244,7 @@ describe('Seed Data Geometry & Seat Placement Stress Verification', () => {
     expect(sections.length).toBeGreaterThan(0);
     console.log(`Inspecting ${sections.length} total seeded sections...`);
 
-    const shapeCounts: Record<ShapeType, number> = {
+    const shapeCounts: Record<string, number> = {
       RECTANGLE: 0,
       SQUARE: 0,
       TRIANGLE: 0,

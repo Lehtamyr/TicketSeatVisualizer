@@ -354,8 +354,8 @@ test.describe('Tier 2 Boundary Tests - R3: Interactive Admin Layout Builder Boun
       },
     };
 
-    assertValidSectionDTO({ ...sectionA, totalSeats: 10, availableSeats: 10 });
-    assertValidSectionDTO({ ...sectionB, totalSeats: 10, availableSeats: 10 });
+    assertValidSectionDTO({ ...sectionA, totalSeats: 10, availableSeats: 10 } as any);
+    assertValidSectionDTO({ ...sectionB, totalSeats: 10, availableSeats: 10 } as any);
 
     await page.route('**/api/layouts/layout-overlap', async (route) => {
       await route.fulfill({

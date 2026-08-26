@@ -165,10 +165,9 @@ async function syncPricingTiers(
 
     if (isUpdate) {
       await tx.pricingTier.deleteMany({
-        where: {
-          layoutId,
-          id: { notIn: incomingTierIds },
-        },
+        where: incomingTierIds.length > 0
+          ? { layoutId, id: { notIn: incomingTierIds } }
+          : { layoutId },
       });
     }
   } else if (isUpdate) {
@@ -224,7 +223,7 @@ async function createSectionsAndSeats(
         const dbTier = await tx.pricingTier.findFirst({
           where: {
             id: mappedId,
-            OR: [{ layoutId }, { layoutId: null }],
+            layoutId: layoutId,
           },
         });
         if (dbTier) {

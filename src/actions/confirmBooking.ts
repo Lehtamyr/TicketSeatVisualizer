@@ -65,32 +65,26 @@ export async function confirmBookingAction(input: ConfirmBookingInput): Promise<
         const buyer = input.buyerInfo || {};
         const method = input.paymentMethod || 'QRIS';
 
+        const customerName = `${buyer.firstName || 'Pemesan'} ${buyer.lastName || 'Tiket'}`.trim();
+        const customerEmail = buyer.email || 'customer@ticketseat.com';
+        const customerPhone = `${buyer.dialCode || '+62'} ${buyer.phoneNumber || ''}`.trim();
+        const identityType = buyer.identityType || 'KTP';
+        const identityNumber = buyer.identityNumber || '3171000000000000';
+
         // 4. Create permanent Order record
         const order = await tx.order.create({
           data: {
             orderNumber,
-            eventId: reservation.eventId,
             reservationId: reservation.id,
-            userSessionId: effectiveSessionId,
-            buyerFirstName: buyer.firstName || 'Pemesan',
-            buyerLastName: buyer.lastName || 'Tiket',
-            buyerEmail: buyer.email || 'customer@ticketseat.com',
-            buyerPhone: `${buyer.dialCode || '+62'} ${buyer.phoneNumber || ''}`.trim(),
-            buyerIdType: buyer.identityType || 'KTP',
-            buyerIdNumber: buyer.identityNumber || '3171000000000000',
-            paymentMethod: method as any,
+            customerName,
+            customerEmail,
+            customerPhone,
+            identityType,
+            identityNumber,
+            paymentMethod: method,
+            paymentStatus: 'PAID',
             totalAmount: reservation.totalAmount,
-            status: 'COMPLETED',
-            items: {
-              create: reservation.seats.map((rs) => ({
-                seatId: rs.seat.id,
-                seatRow: rs.seat.row,
-                seatNumber: rs.seat.number,
-                sectionName: rs.seat.section.name,
-                tierName: rs.seat.pricingTier?.name || 'Standard',
-                pricePaid: rs.priceLocked,
-              })),
-            },
+            paidAt: new Date(),
           },
         });
 

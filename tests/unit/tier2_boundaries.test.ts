@@ -181,8 +181,8 @@ describe('Tier 2 Boundary Tests - R4: Database & API Layer Boundaries', () => {
     const sweepResult = runExpiredHoldSweeper(mockReservations, mockSeats, now);
     expect(sweepResult.expiredResCount).toBe(1200);
     expect(sweepResult.releasedSeatsCount).toBe(1200);
-    expect(mockReservations.every((r) => r.status === 'EXPIRED')).toBe(true);
-    expect(mockSeats.every((s) => s.status === 'AVAILABLE')).toBe(true);
+    expect(mockReservations.every((r) => (r.status as string) === 'EXPIRED')).toBe(true);
+    expect(mockSeats.every((s) => (s.status as string) === 'AVAILABLE')).toBe(true);
   });
 
   it('R4.4 DB Boundary: Requesting non-existent event UUID returns 404 response', async () => {
