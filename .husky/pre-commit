@@ -1,0 +1,2 @@
+echo "[Pre-Commit Gate] Running Lint, Typecheck, and Full Test Suite..."
+npm run lint && npm run typecheck && npm run test:all
