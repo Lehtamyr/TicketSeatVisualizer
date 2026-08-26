@@ -45,10 +45,9 @@ test.describe('Complete Multi-Page Ticket Purchase & Checkout Flow E2E Tests', (
     // Verify solid brand badges are rendered
     await expect(page.getByText('QRIS STANDAR')).toBeVisible();
     await expect(page.getByText('BANK DKI / JAKARTA')).toBeVisible();
-    await expect(page.getByText('BCA OFFICIAL')).toBeVisible();
 
-    // Select BCA Virtual Account option
-    await page.click('label:has-text("BCA Virtual Account")');
+    // Select Bank Jakarta Virtual Account option
+    await page.click('label:has-text("Bank Jakarta / Bank DKI Virtual Account")');
 
     // Click "Lanjutkan" to trigger confirmation popup
     await page.click('button:has-text("Lanjutkan")');
@@ -62,7 +61,7 @@ test.describe('Complete Multi-Page Ticket Purchase & Checkout Flow E2E Tests', (
     await expect(page.getByText('Konfirmasi', { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Informasi Pembeli' })).toBeVisible();
     await expect(page.getByText('Ahmad Dahlan')).toBeVisible();
-    await expect(page.getByText('BCA Virtual Account', { exact: true })).toBeVisible();
+    await expect(page.getByText('Bank Jakarta / Bank DKI Virtual Account', { exact: true })).toBeVisible();
 
     // Click "Bayar Sekarang" -> Navigates to Step 4
     await page.click('button:has-text("Bayar Sekarang")');

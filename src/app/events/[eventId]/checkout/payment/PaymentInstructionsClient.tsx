@@ -91,9 +91,10 @@ export function PaymentInstructionsClient({
 
   const isUrgent = timeLeft < 60;
 
-  // Mock Virtual Account Number generator
-  const vaPrefix = paymentMethod === 'BANK_JAKARTA_VA' ? '8801' : '8077';
-  const vaNumber = `${vaPrefix} ${reservationId.replace(/\D/g, '').padEnd(12, '8').slice(0, 12).replace(/(\d{4})/g, '$1 ').trim()}`;
+  // Mock Virtual Account Number generator (Prefix 99 + 8 digits)
+  const vaPrefix = '99';
+  const cleanDigits = reservationId.replace(/\D/g, '').padEnd(8, '8').slice(0, 8);
+  const vaNumber = `${vaPrefix} ${cleanDigits.slice(0, 4)} ${cleanDigits.slice(4, 8)}`;
 
   const handleCopyVa = () => {
     navigator.clipboard.writeText(vaNumber.replace(/\s/g, ''));
@@ -235,13 +236,13 @@ export function PaymentInstructionsClient({
                 </div>
               </div>
             ) : (
-              /* Virtual Account View (Bank Jakarta / BCA) */
+              /* Virtual Account View (Bank Jakarta) */
               <div className="glass-elevated rounded-2xl border border-subtle p-6 shadow-md flex flex-col gap-4">
                 <div className="flex items-center gap-2.5 pb-3 border-b border-subtle">
                   <Building size={20} className="text-accent" />
                   <div>
                     <h2 className="text-base font-bold text-primary">
-                      {paymentMethod === 'BANK_JAKARTA_VA' ? 'Bank Jakarta / Bank DKI Virtual Account' : 'BCA Virtual Account'}
+                      Bank Jakarta / Bank DKI Virtual Account
                     </h2>
                     <p className="text-xs text-secondary mt-0.5">Transfer sebelum batas waktu habis</p>
                   </div>

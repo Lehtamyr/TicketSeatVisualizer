@@ -1,0 +1,2 @@
+echo "[Pre-Push Gate] Running Full Unit & E2E Test Suites..."
+npm run test:all

@@ -62,18 +62,20 @@ describe('2. Journey Tracker Step Calculation Unit Tests', () => {
 });
 
 describe('3. Payment Method Mapping & Mock VA Generation Unit Tests', () => {
-  it('should assign correct VA prefix for Bank Jakarta and BCA', () => {
+  it('should assign prefix 99 and 8 digits for Bank Jakarta Virtual Account', () => {
     const getVaNumber = (method: string, reservationId: string) => {
-      const vaPrefix = method === 'BANK_JAKARTA_VA' ? '8801' : '8077';
-      const cleanDigits = reservationId.replace(/\D/g, '').padEnd(12, '8').slice(0, 12);
-      return `${vaPrefix} ${cleanDigits.replace(/(\d{4})/g, '$1 ').trim()}`;
+      const vaPrefix = '99';
+      const cleanDigits = reservationId.replace(/\D/g, '').padEnd(8, '8').slice(0, 8);
+      return `${vaPrefix} ${cleanDigits.slice(0, 4)} ${cleanDigits.slice(4, 8)}`;
     };
 
     const mockResId = 'res-1234-5678-90ab';
     const jakartaVa = getVaNumber('BANK_JAKARTA_VA', mockResId);
-    const bcaVa = getVaNumber('BCA_VA', mockResId);
 
-    expect(jakartaVa.startsWith('8801')).toBe(true);
-    expect(bcaVa.startsWith('8077')).toBe(true);
+    expect(jakartaVa.startsWith('99 ')).toBe(true);
+    const rawVaDigits = jakartaVa.replace(/\s/g, '');
+    expect(rawVaDigits.length).toBe(10);
+    expect(rawVaDigits.startsWith('99')).toBe(true);
+    expect(rawVaDigits).toBe('9912345678');
   });
 });

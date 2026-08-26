@@ -112,8 +112,8 @@ test.describe('Checkout Process Flow - Input Validation & Edge Case E2E Tests', 
     await expect(page.getByText('Konfirmasi Pilihan Pembayaran')).not.toBeVisible();
     await expect(page).toHaveURL(new RegExp(`/events/event-concert-1/checkout/payment-method.*`));
 
-    // 4. Switch to BCA Virtual Account and proceed
-    await page.click('label:has-text("BCA Virtual Account")');
+    // 4. Switch to Bank Jakarta Virtual Account and proceed
+    await page.click('label:has-text("Bank Jakarta / Bank DKI Virtual Account")');
     await page.click('button:has-text("Lanjutkan")');
     await expect(page.getByText('Konfirmasi Pilihan Pembayaran')).toBeVisible();
     await page.click('button:has-text("Ya, Lanjutkan")');
@@ -123,7 +123,7 @@ test.describe('Checkout Process Flow - Input Validation & Edge Case E2E Tests', 
     await expect(page.getByText('Dewi Sartika')).toBeVisible();
     await expect(page.getByText('dewi.sartika@example.com')).toBeVisible();
     await expect(page.getByText('3273012345678901')).toBeVisible();
-    await expect(page.getByText('BCA Virtual Account', { exact: true })).toBeVisible();
+    await expect(page.getByText('Bank Jakarta / Bank DKI Virtual Account', { exact: true })).toBeVisible();
 
     // 6. Test Backtracking: Click "Ubah Data" to return to Step 2A and verify inputs preserved
     await page.click('a:has-text("Ubah Data")');
@@ -151,8 +151,8 @@ test.describe('Checkout Process Flow - Input Validation & Edge Case E2E Tests', 
     }
     await page.click('button:has-text("Lanjut ke Metode Pembayaran")');
 
-    // Select BCA VA
-    await page.click('label:has-text("BCA Virtual Account")');
+    // Select Bank Jakarta VA
+    await page.click('label:has-text("Bank Jakarta / Bank DKI Virtual Account")');
     await page.click('button:has-text("Lanjutkan")');
     await page.click('button:has-text("Ya, Lanjutkan")');
 

@@ -101,17 +101,10 @@ export function ConfirmationClient({
           badgeColor: 'bg-orange-600 text-white',
           desc: 'Transfer via JakOne Mobile, ATM Bank DKI, atau transfer antar bank.',
         };
-      case 'BCA_VA':
-        return {
-          title: 'BCA Virtual Account',
-          icon: <Building size={20} className="text-blue-600" />,
-          badgeColor: 'bg-blue-600 text-white',
-          desc: 'Transfer via BCA Mobile, myBCA, KlikBCA, atau ATM BCA.',
-        };
       case 'QRIS':
       default:
         return {
-          title: 'QRIS (Gopay / OVO / Dana / BCA / LinkAja)',
+          title: 'QRIS (Gopay / OVO / Dana / LinkAja / M-Banking)',
           icon: <QrCode size={20} className="text-red-600" />,
           badgeColor: 'bg-red-600 text-white',
           desc: 'Scan QR Code menggunakan seluruh aplikasi dompet digital & mobile banking.',

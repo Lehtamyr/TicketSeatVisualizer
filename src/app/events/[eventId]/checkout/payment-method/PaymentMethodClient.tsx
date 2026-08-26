@@ -40,7 +40,7 @@ interface PaymentMethodClientProps {
   expiresAtIso: string;
 }
 
-type PaymentMethodType = 'QRIS' | 'BANK_JAKARTA_VA' | 'BCA_VA';
+type PaymentMethodType = 'QRIS' | 'BANK_JAKARTA_VA';
 
 export function PaymentMethodClient({
   event,
@@ -102,14 +102,6 @@ export function PaymentMethodClient({
       desc: 'Nomor Virtual Account resmi Bank DKI untuk transfer via JakOne Mobile & ATM',
       badgeColor: 'bg-orange-600 text-white',
       badgeText: 'BANK DKI / JAKARTA',
-    },
-    {
-      id: 'BCA_VA' as PaymentMethodType,
-      title: 'BCA Virtual Account',
-      icon: <Building size={20} className="text-blue-600" />,
-      desc: 'Nomor Virtual Account resmi BCA untuk BCA Mobile, myBCA, KlikBCA & ATM',
-      badgeColor: 'bg-blue-600 text-white',
-      badgeText: 'BCA OFFICIAL',
     },
   ];
 

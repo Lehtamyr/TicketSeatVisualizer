@@ -2,7 +2,7 @@ export interface Point { x: number; y: number; }
 export type ShapeType = 'RECTANGLE' | 'SQUARE' | 'TRIANGLE' | 'POLYGON' | 'CIRCLE' | 'STAGE';
 export type SeatStatus = 'AVAILABLE' | 'HELD' | 'RESERVED' | 'BLOCKED';
 export type ReservationStatus = 'PENDING' | 'CONFIRMED' | 'EXPIRED' | 'CANCELLED';
-export type PaymentMethodType = 'QRIS' | 'BANK_JAKARTA_VA' | 'BCA_VA';
+export type PaymentMethodType = 'QRIS' | 'BANK_JAKARTA_VA';
 
 export interface SectionGeometry {
   shapeType: ShapeType;
@@ -139,7 +139,7 @@ export interface ConfirmBookingInput {
     identityType?: string;
     identityNumber?: string;
   };
-  paymentMethod?: 'QRIS' | 'BANK_JAKARTA_VA' | 'BCA_VA';
+  paymentMethod?: PaymentMethodType;
 }
 
 export interface ConfirmBookingResult {
