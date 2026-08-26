@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --workers=5",
     "test:all": "npm test && npm run test:e2e",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",

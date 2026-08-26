@@ -3,11 +3,12 @@ import { ensureE2eTestData } from '../helpers/e2eDbSeed';
 import { prisma } from '@/lib/prisma';
 
 test.describe('Checkout Process Flow - Input Validation & Edge Case E2E Tests', () => {
-  const activeReservationId = 'res-e2e-active-001';
+  let activeReservationId: string;
 
-  test.beforeEach(async () => {
-    // Seed fresh test event and active pending reservation in PostgreSQL
-    await ensureE2eTestData();
+  test.beforeEach(async ({}, testInfo) => {
+    // Seed fresh test event and worker-isolated active pending reservation in PostgreSQL
+    activeReservationId = `res-e2e-edge-w${testInfo.workerIndex}`;
+    await ensureE2eTestData(activeReservationId);
   });
 
   test('Edge Case 1: Missing mandatory inputs and terms validation on Step 2A', async ({ page }) => {

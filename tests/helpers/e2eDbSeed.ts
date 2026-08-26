@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 
-export async function ensureE2eTestData() {
+export async function ensureE2eTestData(targetReservationId = 'res-e2e-active-001') {
   // 1. Check or create test event with retry to handle sleeping serverless database instances (Neon)
   let event: any = null;
   let attempts = 0;
@@ -83,7 +83,7 @@ export async function ensureE2eTestData() {
                 pricingTierId: tier.id,
                 price: 150000,
                 seats: {
-                  create: Array.from({ length: 10 }, (_, i) => ({
+                  create: Array.from({ length: 20 }, (_, i) => ({
                     id: `seat-test-${i + 1}`,
                     row: 'A',
                     number: i + 1,
@@ -106,27 +106,33 @@ export async function ensureE2eTestData() {
 
     if (!event) return;
 
-    // 2. Create or refresh active test reservation
-    const testSeat = await prisma.seat.findFirst({
+    // Find or pick a seat for this reservation
+    const testSeats = await prisma.seat.findMany({
       where: { section: { eventId: event.id } },
+      take: 10,
     });
+
+    const seatIndex = Math.abs(
+      targetReservationId.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % (testSeats.length || 1)
+    );
+    const testSeat = testSeats[seatIndex] || testSeats[0];
 
     if (testSeat) {
       await prisma.reservationSeat.deleteMany({
-        where: { reservationId: 'res-e2e-active-001' },
+        where: { reservationId: targetReservationId },
       });
       await prisma.order.deleteMany({
-        where: { reservationId: 'res-e2e-active-001' },
+        where: { reservationId: targetReservationId },
       });
       await prisma.reservation.deleteMany({
-        where: { id: 'res-e2e-active-001' },
+        where: { id: targetReservationId },
       });
 
       await prisma.reservation.create({
         data: {
-          id: 'res-e2e-active-001',
+          id: targetReservationId,
           eventId: event.id,
-          userSessionId: 'sess-e2e-tester',
+          userSessionId: `sess-${targetReservationId}`,
           status: 'PENDING',
           totalAmount: 150000,
           expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 mins

@@ -84,6 +84,8 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
 
   const lastLockedIdsRef = useRef<string[]>([]);
   const selectedSeatIdsRef = useRef<Set<string>>(selectedSeatIds);
+  const pendingReleasedIdsRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     selectedSeatIdsRef.current = selectedSeatIds;
   }, [selectedSeatIds]);
@@ -91,6 +93,12 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
 
   const handleToggleSeat = useCallback((seat: SeatDTO) => {
     const isDeselecting = selectedSeatIds.has(seat.id);
+    if (isDeselecting) {
+      pendingReleasedIdsRef.current.add(seat.id);
+    } else {
+      pendingReleasedIdsRef.current.delete(seat.id);
+    }
+
     setSelectedSeatIds((prev) => {
       const next = new Set(prev);
       if (next.has(seat.id)) next.delete(seat.id);
@@ -108,12 +116,14 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
     // Optimistically mark deselected seat as AVAILABLE in local state
     if (isDeselecting) {
       setSeats((prev) => prev.map((s) =>
-        s.id === seat.id ? { ...s, status: 'AVAILABLE' } : s
+        s.id === seat.id ? { ...s, status: 'AVAILABLE', heldBy: undefined } : s
       ));
     }
   }, [selectedSeatIds]);
 
   const handleClearSeat = useCallback((seatId: string) => {
+    pendingReleasedIdsRef.current.add(seatId);
+
     setSelectedSeatIds((prev) => {
       const next = new Set(prev);
       next.delete(seatId);
@@ -126,7 +136,7 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
     });
     // Optimistically mark cleared seat as AVAILABLE in local state
     setSeats((prev) => prev.map((s) =>
-      s.id === seatId ? { ...s, status: 'AVAILABLE' } : s
+      s.id === seatId ? { ...s, status: 'AVAILABLE', heldBy: undefined } : s
     ));
   }, []);
 
@@ -134,6 +144,7 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
     if (!selectedSection) return;
     // Refresh seats
     lastLockedIdsRef.current = [];
+    pendingReleasedIdsRef.current.clear();
     setSelectedSeatIds(new Set());
     const refreshed = await fetchLiveSectionSeats(selectedSection.id);
     setSeats(refreshed);
@@ -161,12 +172,22 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
           const update = JSON.parse(evt.data);
           if (update.seatIds && Array.isArray(update.seatIds)) {
             const affectedIds = new Set(update.seatIds);
+            
+            // Clean up any pending released IDs once an update arrives
+            if (update.status === 'AVAILABLE') {
+              update.seatIds.forEach((id: string) => pendingReleasedIdsRef.current.delete(id));
+            }
+
             setSeats((prev) =>
               prev.map((s) => {
                 if (affectedIds.has(s.id)) {
                   // Don't overwrite locally selected seats for current user
                   if (selectedSeatIdsRef.current.has(s.id) && update.userSessionId === sessionId) {
                     return s;
+                  }
+                  // Don't overwrite locally deselected seats if update is a stale HELD
+                  if (pendingReleasedIdsRef.current.has(s.id) && update.status === 'HELD') {
+                    return { ...s, status: 'AVAILABLE', heldBy: undefined };
                   }
                   return {
                     ...s,
@@ -201,10 +222,16 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
               if (updated) {
                 // If this seat is currently selected locally by the user, keep status as AVAILABLE or locally handled
                 const isLocallySelected = selectedSeatIdsRef.current.has(oldSeat.id);
+                // If this seat was recently deselected locally, prevent stale HELD status from overwriting
+                const isPendingReleased = pendingReleasedIdsRef.current.has(oldSeat.id);
+                const resolvedStatus = isLocallySelected || isPendingReleased
+                  ? 'AVAILABLE'
+                  : updated.status;
+
                 return {
                   ...oldSeat,
                   ...updated,
-                  status: isLocallySelected ? 'AVAILABLE' : updated.status,
+                  status: resolvedStatus,
                   price: updated.price ?? oldSeat.price,
                 };
               }
@@ -236,9 +263,10 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
     };
   }, [view, selectedSection, event.id, sessionId]);
 
-  // Debounced database lock synchronization
+  // View-agnostic database lock synchronization
+  // Runs in both 'seats' and 'map' view so clearing seats from the cart always syncs with the DB and broadcasts SSE
   useEffect(() => {
-    if (view !== 'seats' || !selectedSection || sessionId === 'sess-ssr') return;
+    if (sessionId === 'sess-ssr') return;
 
     const currentIds = Array.from(selectedSeatIds).sort();
     const lastIds = [...lastLockedIdsRef.current].sort();
@@ -247,6 +275,10 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
     if (JSON.stringify(currentIds) === JSON.stringify(lastIds)) {
       return;
     }
+
+    // Fast-path: if deselected/released a seat, sync with minimal delay (50ms) to ensure other users see AVAILABLE instantly
+    const isReleasing = currentIds.length < lastIds.length;
+    const delay = isReleasing ? 50 : 250;
 
     const timerId = setTimeout(async () => {
       setLockError(null);
@@ -282,15 +314,16 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
           setLockError(data.error || 'One or more seats are no longer available.');
           return;
         }
-        // Success: update reference
+        // Success: update reference and clear confirmed released IDs
         lastLockedIdsRef.current = currentIds;
+        currentIds.forEach((id) => pendingReleasedIdsRef.current.delete(id));
       } catch (err: any) {
         setLockError(err.message || 'Failed to sync selected seats.');
       }
-    }, 300); // 300ms debounce delay
+    }, delay);
 
     return () => clearTimeout(timerId);
-  }, [selectedSeatIds, view, selectedSection, event.id, sessionId]);
+  }, [selectedSeatIds, event.id, sessionId]);
 
   const effectiveSeats = useMemo(() => {
     if (seats && seats.length > 0) return seats;

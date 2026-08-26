@@ -2,11 +2,12 @@ import { test, expect } from '@playwright/test';
 import { ensureE2eTestData } from '../helpers/e2eDbSeed';
 
 test.describe('Complete Multi-Page Ticket Purchase & Checkout Flow E2E Tests', () => {
-  const activeReservationId = 'res-e2e-active-001';
+  let activeReservationId: string;
 
-  test.beforeEach(async () => {
-    // Seed fresh test event and active pending reservation in PostgreSQL
-    await ensureE2eTestData();
+  test.beforeEach(async ({}, testInfo) => {
+    // Seed fresh test event and worker-isolated active pending reservation in PostgreSQL
+    activeReservationId = `res-e2e-funnel-w${testInfo.workerIndex}`;
+    await ensureE2eTestData(activeReservationId);
   });
 
   test('Complete End-to-End Flow: from Checkout Form to Payment Simulation and Success Modal', async ({ page }) => {
