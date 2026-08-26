@@ -39,24 +39,22 @@ yarn-error.log*
 *.pem
 .vscode/
 .idea/
+*:Zone.Identifier
 
-# Agent directory
+# Agent & tool data
 .agents/
+.gemini*/
+graphify*/
+settings.json
+SYSTEM_DOCUMENTATION.md
 
-# Local binary/debs/libs directories
+# Local binary/debs/libs/scratch directories
 debs/
 libs/
+scratch_*.ts
 scratch_test_save.ts
-*:Zone.Identifier
 debug_*.txt
 debug_*.json
 test_*.js
 query_*.ts
 query_*.js
-
-graphify*/
-settings.json
-
-SYSTEM_DOCUMENTATION.md
-
-.gemini*/

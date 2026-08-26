@@ -3,8 +3,24 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [main, master, develop]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.vscode/**'
+      - '.idea/**'
+      - '.gitignore'
+      - '.dockerignore'
+      - 'LICENSE'
   pull_request:
     branches: [main, master]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.vscode/**'
+      - '.idea/**'
+      - '.gitignore'
+      - '.dockerignore'
+      - 'LICENSE'
 
 permissions:
   contents: read

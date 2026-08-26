@@ -1,13 +1,54 @@
+# Dependencies & build outputs
 node_modules
 .next
+out
+build
+*.tsbuildinfo
+
+# Version control & Git hooks
 .git
 .github
+.husky
+
+# Testing & Coverage
+coverage
 playwright-report
 test-results
-coverage
-graphify-out
 tests
+
+# Documentation & Markdown
 *.md
+SYSTEM_DOCUMENTATION.md
+
+# Environment variables & secrets
 .env*
 !.env.example
-SYSTEM_DOCUMENTATION.md
+*.pem
+
+# Database & SQLite files
+*.db*
+*.sqlite*
+
+# IDE, OS & Agent directories
+.vscode
+.idea
+.DS_Store
+*:Zone.Identifier
+.agents
+.gemini*
+graphify*
+settings.json
+
+# Local scripts, temporary & debug files
+debs
+libs
+scratch_*
+debug_*
+test_*
+query_*
+*.log
+
+# Docker setup files
+Dockerfile*
+docker-compose*
+
