@@ -1,6 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 import { neonConfig } from '@neondatabase/serverless';
 import { PrismaNeon } from '@prisma/adapter-neon';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 import ws from 'ws';
 
 // Configure WebSocket constructor globally on neonConfig
@@ -25,6 +27,15 @@ function createPrismaClient(): PrismaClient {
   }
 
   // Standard PostgreSQL connection fallback for local / non-Neon databases
+  if (connectionString) {
+    const pool = new Pool({ connectionString });
+    const adapter = new PrismaPg(pool);
+    return new PrismaClient({
+      adapter,
+      log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    });
+  }
+
   return new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   });

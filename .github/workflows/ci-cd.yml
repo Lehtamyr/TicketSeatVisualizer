@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, master]
 
+permissions:
+  contents: read
+  packages: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -17,6 +21,26 @@ jobs:
   code-quality:
     name: Code Quality & Unit Tests
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: ticketing_test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:password@localhost:5432/ticketing_test_db
+      NODE_ENV: test
+      CI: true
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -32,6 +56,11 @@ jobs:
 
       - name: Run Prisma Generate
         run: npx prisma generate
+
+      - name: Push Database Schema & Seed Test Data
+        run: |
+          npx prisma db push
+          npm run db:seed
 
       - name: Run ESLint
         run: npm run lint
