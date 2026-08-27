@@ -5,8 +5,9 @@ test.describe('Complete Multi-Page Ticket Purchase & Checkout Flow E2E Tests', (
   let activeReservationId: string;
 
   test.beforeEach(async ({}, testInfo) => {
-    // Seed fresh test event and worker-isolated active pending reservation in PostgreSQL
-    activeReservationId = `res-e2e-funnel-w${testInfo.workerIndex}`;
+    // Seed fresh test event and unique test-isolated pending reservation in PostgreSQL
+    const cleanTestTitle = testInfo.title.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10).toLowerCase();
+    activeReservationId = `res-e2e-f-${testInfo.workerIndex}-${cleanTestTitle}`;
     await ensureE2eTestData(activeReservationId);
   });
 
@@ -115,12 +116,18 @@ test.describe('Complete Multi-Page Ticket Purchase & Checkout Flow E2E Tests', (
 
     // Step 4 Payment
     await expect(page).toHaveURL(new RegExp(`/events/event-concert-1/checkout/payment.*`));
-    await expect(page.getByText('Pembayaran QRIS Standar Nasional')).toBeVisible();
+    await expect(page.getByText('Pembayaran QRIS Bank Jakarta')).toBeVisible();
     await expect(page.getByText('TSV · QRIS PAY')).toBeVisible();
     await expect(page.getByText('Petunjuk Pembayaran QRIS:')).toBeVisible();
+    await expect(page.getByText('SEATING NUMBERS TICKET INCLUDES GOVERNMENT FEE 10% AND PLATFORM FEE 5%')).toBeVisible();
 
     // Simulate Payment
     await page.click('button:has-text("Simulasikan Pembayaran Berhasil")');
     await expect(page.getByText('Pembayaran Berhasil!')).toBeVisible();
+
+    // Verify Download E-Ticket PDF button is visible and links to download endpoint
+    const downloadBtn = page.getByRole('link', { name: 'Unduh E-Ticket (PDF)' });
+    await expect(downloadBtn).toBeVisible();
+    await expect(downloadBtn).toHaveAttribute('href', new RegExp(`/api/tickets/download\\?reservationId=.*`));
   });
 });

@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   AlertTriangle,
   Info,
+  FileDown,
 } from 'lucide-react';
 import { CheckoutJourneyTracker } from '@/components/checkout/CheckoutJourneyTracker';
 import { getStoredBuyerInfo } from '@/lib/buyerStorage';
@@ -163,11 +164,10 @@ export function PaymentInstructionsClient({
         {/* Sticky Countdown Timer */}
         <div className="w-full sticky top-[60px] z-30 pb-2">
           <div
-            className={`w-full py-3 px-6 rounded-2xl border flex items-center justify-center gap-3 shadow-lg backdrop-blur-md transition-all ${
-              isUrgent
+            className={`w-full py-3 px-6 rounded-2xl border flex items-center justify-center gap-3 shadow-lg backdrop-blur-md transition-all ${isUrgent
                 ? 'bg-red-500/15 border-red-500/50 text-red-400 animate-pulse'
                 : 'glass-elevated bg-secondary/95 border-subtle text-primary shadow-slate-200/50'
-            }`}
+              }`}
           >
             <Clock size={18} className={isUrgent ? 'text-red-400' : 'text-accent'} />
             <span className="text-xs sm:text-sm font-medium text-secondary">
@@ -188,7 +188,7 @@ export function PaymentInstructionsClient({
               <div className="glass-elevated rounded-2xl border border-subtle p-6 shadow-md flex flex-col items-center text-center gap-4">
                 <div className="flex items-center gap-2 pb-2">
                   <QrCode size={20} className="text-accent" />
-                  <h2 className="text-base font-bold text-primary">Pembayaran QRIS Standar Nasional</h2>
+                  <h2 className="text-base font-bold text-primary">Pembayaran QRIS Bank Jakarta</h2>
                 </div>
                 <p className="text-xs text-secondary max-w-md">
                   Buka aplikasi mobile banking atau e-wallet pilihan Anda (BCA, Mandiri, GoPay, OVO, Dana, ShopeePay, dll), lalu scan kode QR di bawah:
@@ -378,11 +378,15 @@ export function PaymentInstructionsClient({
               <div className="border-t border-subtle pt-3 flex flex-col gap-2 text-xs">
                 <div className="flex justify-between text-secondary">
                   <span>Subtotal Tiket ({bookedSeats.length})</span>
-                  <span className="font-mono text-primary">Rp {totalAmount.toLocaleString('id-ID')}</span>
+                  <span className="font-mono text-primary font-semibold">Rp {totalAmount.toLocaleString('id-ID')}</span>
                 </div>
                 <div className="flex justify-between text-secondary">
                   <span>Biaya Layanan & Pajak</span>
                   <span className="font-mono text-emerald-600 font-medium">Rp 0 (Termasuk)</span>
+                </div>
+                {/* Government & Platform fee notice */}
+                <div className="p-2.5 rounded-lg bg-blue-50/70 border border-blue-200/80 text-[10.5px] text-blue-900 font-medium leading-relaxed">
+                  <span className="font-bold text-blue-950">Notice:</span> SEATING NUMBERS TICKET INCLUDES GOVERNMENT FEE 10% AND PLATFORM FEE 5%
                 </div>
                 <div className="border-t border-subtle pt-2.5 mt-1 flex justify-between items-center">
                   <span className="text-sm font-bold text-primary">Total Tagihan</span>
@@ -411,11 +415,11 @@ export function PaymentInstructionsClient({
               <CheckCircle2 size={36} />
             </div>
             <h3 className="text-xl font-bold text-primary mb-1">Pembayaran Berhasil!</h3>
-            <p className="text-xs text-secondary mb-6">
+            <p className="text-xs text-secondary mb-5">
               Tiket Anda telah berhasil dikonfirmasi. Rincian e-ticket telah dikirimkan ke <span className="font-semibold text-primary">{buyerInfo?.email || 'email Anda'}</span>.
             </p>
 
-            <div className="bg-primary border border-subtle rounded-xl p-4 mb-6 text-left flex flex-col gap-2 text-xs">
+            <div className="bg-primary border border-subtle rounded-xl p-4 mb-5 text-left flex flex-col gap-2 text-xs">
               <div className="flex justify-between">
                 <span className="text-secondary">Kode Booking</span>
                 <span className="font-mono font-bold text-accent">{reservationId.slice(0, 8).toUpperCase()}</span>
@@ -435,17 +439,27 @@ export function PaymentInstructionsClient({
             </div>
 
             <div className="flex flex-col gap-2.5">
+              {/* Primary Action: Download E-Ticket PDF */}
+              <a
+                href={`/api/tickets/download?reservationId=${reservationId}`}
+                download={`E-Ticket-${reservationId.slice(0, 8).toUpperCase()}.pdf`}
+                className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <FileDown size={16} />
+                <span>Unduh E-Ticket (PDF)</span>
+              </a>
+
               <button
                 type="button"
                 onClick={() => router.push(`/events/${event.id}`)}
-                className="w-full py-3 rounded-xl bg-accent hover:bg-accent-hover text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+                className="w-full py-2.5 rounded-xl bg-accent hover:bg-accent-hover text-white font-bold text-xs shadow-md transition-all cursor-pointer"
               >
                 Kembali ke Halaman Event
               </button>
               <button
                 type="button"
                 onClick={() => router.push('/events')}
-                className="w-full py-2.5 rounded-xl border border-subtle text-xs font-semibold text-secondary hover:bg-primary transition-colors cursor-pointer"
+                className="w-full py-2 rounded-xl border border-subtle text-xs font-semibold text-secondary hover:bg-primary transition-colors cursor-pointer"
               >
                 Lihat Event Lainnya
               </button>

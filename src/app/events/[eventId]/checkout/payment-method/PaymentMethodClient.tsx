@@ -89,7 +89,7 @@ export function PaymentMethodClient({
   const paymentOptions = [
     {
       id: 'QRIS' as PaymentMethodType,
-      title: 'QRIS (Gopay / OVO / Dana / LinkAja / All M-Banking)',
+      title: 'QRIS (Bank Jakarta)',
       icon: <QrCode size={20} className="text-red-600" />,
       desc: 'Scan QRIS otomatis dengan seluruh dompet digital dan aplikasi mobile banking',
       badgeColor: 'bg-red-600 text-white',
@@ -147,11 +147,10 @@ export function PaymentMethodClient({
         {/* Sticky Countdown Timer */}
         <div className="w-full sticky top-[60px] z-30 pb-2">
           <div
-            className={`w-full py-3.5 px-6 rounded-2xl border-2 flex items-center justify-center gap-3 shadow-md backdrop-blur-md transition-all ${
-              isUrgent
+            className={`w-full py-3.5 px-6 rounded-2xl border-2 flex items-center justify-center gap-3 shadow-md backdrop-blur-md transition-all ${isUrgent
                 ? 'bg-red-50 border-red-500 text-red-600 animate-pulse'
                 : 'bg-white border-accent/40 text-primary shadow-blue-100'
-            }`}
+              }`}
           >
             <div className={`p-1.5 rounded-full ${isUrgent ? 'bg-red-100 text-red-600' : 'bg-accent/10 text-accent'}`}>
               <Clock size={16} />
@@ -187,11 +186,10 @@ export function PaymentMethodClient({
                     <label
                       key={opt.id}
                       onClick={() => setSelectedMethod(opt.id)}
-                      className={`flex items-start gap-4 p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                        isSelected
+                      className={`flex items-start gap-4 p-4 rounded-2xl border-2 cursor-pointer transition-all ${isSelected
                           ? 'bg-blue-50/70 border-accent ring-2 ring-accent shadow-sm'
                           : 'bg-slate-50 border-slate-200 text-secondary hover:border-slate-300'
-                      }`}
+                        }`}
                     >
                       <input
                         type="radio"

@@ -361,6 +361,10 @@ export function ConfirmationClient({
                     Rp 0 (Termasuk)
                   </span>
                 </div>
+                {/* Government & Platform fee notice */}
+                <div className="p-2.5 rounded-lg bg-blue-50/70 border border-blue-200/80 text-[10.5px] text-blue-900 font-medium leading-relaxed">
+                  <span className="font-bold text-blue-950">Notice:</span> SEATING NUMBERS TICKET INCLUDES GOVERNMENT FEE 10% AND PLATFORM FEE 5%
+                </div>
                 <div className="border-t-2 border-slate-200 pt-3 mt-1 flex justify-between items-center bg-blue-50/50 p-3 rounded-xl">
                   <span className="text-sm font-bold text-primary">Total Tagihan</span>
                   <span className="text-lg font-bold font-mono text-accent">

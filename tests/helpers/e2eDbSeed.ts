@@ -106,47 +106,69 @@ export async function ensureE2eTestData(targetReservationId = 'res-e2e-active-00
 
     if (!event) return;
 
-    // Find or pick a seat for this reservation
-    const testSeats = await prisma.seat.findMany({
-      where: { section: { eventId: event.id } },
-      take: 10,
+    // Ensure a designated isolated seat exists specifically for this reservation
+    const cleanId = targetReservationId.replace(/[^a-zA-Z0-9]/g, '');
+    const isolatedSeatId = `seat-${cleanId}`;
+    let targetSection = event.sections[0] || (await prisma.section.findFirst({ where: { eventId: event.id } }));
+
+    if (!targetSection) return;
+
+    let testSeat = await prisma.seat.findUnique({
+      where: { id: isolatedSeatId },
     });
 
-    const seatIndex = Math.abs(
-      targetReservationId.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % (testSeats.length || 1)
-    );
-    const testSeat = testSeats[seatIndex] || testSeats[0];
-
-    if (testSeat) {
-      await prisma.reservationSeat.deleteMany({
-        where: { reservationId: targetReservationId },
-      });
-      await prisma.order.deleteMany({
-        where: { reservationId: targetReservationId },
-      });
-      await prisma.reservation.deleteMany({
-        where: { id: targetReservationId },
-      });
-
-      await prisma.reservation.create({
-        data: {
-          id: targetReservationId,
-          eventId: event.id,
-          userSessionId: `sess-${targetReservationId}`,
-          status: 'PENDING',
-          totalAmount: 150000,
-          expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 mins
-          seats: {
-            create: [
-              {
-                seatId: testSeat.id,
-                priceLocked: 150000,
-              },
-            ],
+    if (!testSeat) {
+      const seatNum = Math.abs(cleanId.split('').reduce((acc, c) => acc * 31 + c.charCodeAt(0), 0) % 8000) + 100;
+      testSeat = await prisma.seat.upsert({
+        where: {
+          sectionId_row_number: {
+            sectionId: targetSection.id,
+            row: 'Z',
+            number: seatNum,
           },
+        },
+        update: {},
+        create: {
+          id: isolatedSeatId,
+          sectionId: targetSection.id,
+          row: 'Z',
+          number: seatNum,
+          x: 200,
+          y: 200,
+          status: 'AVAILABLE',
         },
       });
     }
+
+    // Clean up only records belonging to this target reservation
+    await prisma.reservationSeat.deleteMany({
+      where: { reservationId: targetReservationId },
+    });
+    await prisma.order.deleteMany({
+      where: { reservationId: targetReservationId },
+    });
+    await prisma.reservation.deleteMany({
+      where: { id: targetReservationId },
+    });
+
+    await prisma.reservation.create({
+      data: {
+        id: targetReservationId,
+        eventId: event.id,
+        userSessionId: `sess-${targetReservationId}`,
+        status: 'PENDING',
+        totalAmount: 150000,
+        expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 mins
+        seats: {
+          create: [
+            {
+              seatId: testSeat.id,
+              priceLocked: 150000,
+            },
+          ],
+        },
+      },
+    });
   } catch (err: any) {
     console.warn('[ensureE2eTestData] Test data setup warning:', err?.message || err);
   }
