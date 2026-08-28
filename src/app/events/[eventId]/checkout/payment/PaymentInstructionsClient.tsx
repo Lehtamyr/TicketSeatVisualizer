@@ -140,9 +140,18 @@ export function PaymentInstructionsClient({
     setDownloadError(null);
 
     try {
-      const response = await fetch(`/api/tickets/download?reservationId=${encodeURIComponent(reservationId)}`);
+      const downloadUrl = `/api/tickets/download?reservationId=${encodeURIComponent(reservationId)}`;
+      const response = await fetch(downloadUrl);
+      
       if (!response.ok) {
-        throw new Error('Gagal mengunduh file tiket dari server.');
+        let serverErrMsg = '';
+        try {
+          const errData = await response.json();
+          serverErrMsg = errData.error;
+        } catch {
+          // Response was not JSON
+        }
+        throw new Error(serverErrMsg || `Gagal mengunduh file tiket dari server (Status: ${response.status}).`);
       }
 
       const blob = await response.blob();
@@ -152,11 +161,18 @@ export function PaymentInstructionsClient({
       a.download = `E-Ticket-${reservationId.slice(0, 8).toUpperCase()}.pdf`;
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }, 500);
     } catch (err: any) {
       console.error('Download ticket error:', err);
-      setDownloadError(err?.message || 'Terjadi gangguan saat mengunduh tiket. Silakan coba lagi.');
+      // Fallback: Direct window location navigation for mobile / restricted webview environments
+      try {
+        window.location.href = `/api/tickets/download?reservationId=${encodeURIComponent(reservationId)}`;
+      } catch {
+        setDownloadError(err?.message || 'Terjadi gangguan saat mengunduh tiket. Silakan coba lagi.');
+      }
     } finally {
       setIsDownloading(false);
     }

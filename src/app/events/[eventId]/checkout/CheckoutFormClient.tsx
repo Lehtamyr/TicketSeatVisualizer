@@ -436,22 +436,6 @@ export function CheckoutFormClient({
                 </div>
               </div>
 
-              {/* WhatsApp Consent */}
-              <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-xl">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={whatsappConsent}
-                    onChange={(e) => setWhatsappConsent(e.target.checked)}
-                    className="accent-emerald-600 mt-0.5 cursor-pointer"
-                  />
-                  <div className="text-xs text-emerald-900 leading-relaxed">
-                    <span className="font-bold text-emerald-950 block mb-0.5">Notifikasi WhatsApp</span>
-                    Saya setuju untuk menerima notifikasi e-ticket langsung melalui WhatsApp.
-                  </div>
-                </label>
-              </div>
-
               {/* Terms and Privacy */}
               <div className="flex flex-col gap-3 pt-3 border-t border-subtle">
                 <label className="flex items-start gap-2.5 cursor-pointer">
