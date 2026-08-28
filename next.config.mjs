@@ -3,7 +3,11 @@ const nextConfig = {
   output: 'standalone',
   serverExternalPackages: ['pdfkit', 'bwip-js'],
   outputFileTracingIncludes: {
-    '/api/**/*': ['./public/**/*'],
+    '/api/**/*': [
+      './node_modules/pdfkit/**/*',
+      './node_modules/bwip-js/**/*',
+      './public/**/*',
+    ],
   },
   reactStrictMode: true,
   async headers() {

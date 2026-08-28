@@ -348,70 +348,39 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
     if (nonStageSections.length === 0) return [];
 
     const layoutTiers = event.layout?.pricingTiers || [];
-    const usedTierIds = new Set<string>();
-    const usedTierNames = new Set<string>();
-    const sectionsWithoutFormalTier: typeof nonStageSections = [];
+    const tierMap = new Map<string, any>();
 
+    // ponytail: Group sections by tierId (or tier name) so multi-section tiers unify under 1 card
     nonStageSections.forEach((sec) => {
-      const matchedTier = layoutTiers.find(
-        (t: any) =>
-          (sec.tierId && t.id === sec.tierId) ||
-          ((sec as any).pricingTierId && t.id === (sec as any).pricingTierId) ||
-          (sec.tierName && t.name === sec.tierName)
-      );
+      const tierId = sec.tierId || (sec as any).pricingTierId;
+      const matchedTier =
+        (tierId ? layoutTiers.find((t: any) => t.id === tierId) : null) ||
+        (sec.tierName ? layoutTiers.find((t: any) => t.name === sec.tierName) : null) ||
+        sec.pricingTier;
 
-      if (matchedTier) {
-        usedTierIds.add(matchedTier.id);
-        usedTierNames.add(matchedTier.name);
+      const key = matchedTier ? matchedTier.id : (sec.tierName || sec.name || `sec-${sec.id}`);
+      const name = matchedTier ? matchedTier.name : (sec.tierName || sec.name);
+      const color = matchedTier ? matchedTier.color : (sec.tierColor || sec.color || '#3B82F6');
+      const basePrice = matchedTier ? matchedTier.basePrice : sec.price;
+      const description = matchedTier?.description || `Seating for ${name}.`;
+      const salesEndDate = matchedTier?.salesEndDate;
+
+      if (!tierMap.has(key)) {
+        tierMap.set(key, {
+          id: key,
+          name,
+          color,
+          basePrice,
+          description,
+          salesEndDate,
+          sections: [sec],
+        });
       } else {
-        sectionsWithoutFormalTier.push(sec);
+        tierMap.get(key)!.sections.push(sec);
       }
     });
 
-    // Retain only layout tiers that are actively used by at least one section
-    const inUseTiers: any[] = layoutTiers
-      .filter((t: any) => usedTierIds.has(t.id) || usedTierNames.has(t.name))
-      .map((t: any) => ({ ...t }));
-
-    // Group remaining sections without formal tiers by distinct price or derived tierName
-    if (sectionsWithoutFormalTier.length > 0) {
-      const priceGroups = new Map<number, typeof nonStageSections>();
-      sectionsWithoutFormalTier.forEach((sec) => {
-        const p = sec.price || 0;
-        if (!priceGroups.has(p)) priceGroups.set(p, []);
-        priceGroups.get(p)!.push(sec);
-      });
-
-      priceGroups.forEach((secs, price) => {
-        const sample = secs[0];
-        const name =
-          sample.tierName ||
-          (price >= 120_000 || (price > 0 && price <= 500 && price >= 120)
-            ? 'VIP Tier'
-            : price <= 50_000 || (price > 0 && price <= 45)
-            ? 'Economy Tier'
-            : 'Standard Tier');
-
-        const color =
-          sample.tierColor ||
-          sample.color ||
-          (name === 'VIP Tier'
-            ? '#EF4444'
-            : name === 'Economy Tier'
-            ? '#10B981'
-            : '#3B82F6');
-
-        inUseTiers.push({
-          id: sample.tierId || (sample as any).pricingTierId || `tier-fallback-${price}`,
-          name: name,
-          color: color,
-          basePrice: price,
-          description: `Seating covering the ${name} areas.`,
-        });
-      });
-    }
-
-    return inUseTiers.sort((a, b) => b.basePrice - a.basePrice);
+    return Array.from(tierMap.values()).sort((a, b) => b.basePrice - a.basePrice);
   }, [event]);
 
   return (
@@ -543,15 +512,7 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
               <h2 className="text-lg font-bold mb-3 text-primary">Pricing Tiers</h2>
               <div className="flex flex-col gap-4">
                 {activeTiers.map((tier: any) => {
-                  const matchingSections = event.sections.filter(sec => {
-                    if (sec.shapeType === 'STAGE' || sec.geometry?.shapeType === 'STAGE') return false;
-                    if (sec.tierId && sec.tierId === tier.id) return true;
-                    if (sec.tierName && sec.tierName === tier.name) return true;
-                    if (tier.id === `tier-fallback-${sec.price}`) return true;
-                    if (sec.price === tier.basePrice) return true;
-                    return false;
-                  });
-                  const sectionNames = Array.from(new Set(matchingSections.map(s => s.name))).join(', ');
+                  const sectionNames = Array.from(new Set((tier.sections || []).map((s: any) => s.name))).join(', ');
                   
                   return (
                     <div key={tier.id} className="flex gap-4 items-start border-b border-subtle pb-4 last:border-0 last:pb-0">

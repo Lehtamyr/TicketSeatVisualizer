@@ -35,6 +35,7 @@ export async function getEvents(): Promise<EventDTO[]> {
     sections: e.sections.map((s) => {
       const geom = parseGeometry(s.geometry);
       const isStage = s.shapeType === 'STAGE' || geom?.shapeType === 'STAGE';
+      const pricingTier = s.pricingTier || e.layout?.pricingTiers?.find((t) => t.id === s.pricingTierId);
       return {
         id: s.id,
         name: s.name,
@@ -42,10 +43,12 @@ export async function getEvents(): Promise<EventDTO[]> {
         shapeType: (isStage ? 'STAGE' : s.shapeType) as SectionDTO['shapeType'],
         geometry: geom,
         price: isStage ? 0 : Number(s.price),
-        color: s.color,
-        tierId: isStage ? undefined : (s.pricingTierId ?? s.pricingTier?.id ?? undefined),
-        tierName: isStage ? undefined : s.pricingTier?.name,
-        tierColor: isStage ? undefined : s.pricingTier?.color,
+        color: isStage ? '#64748B' : (s.color || pricingTier?.color || '#3B82F6'),
+        pricingTierId: isStage ? null : (s.pricingTierId ?? pricingTier?.id ?? null),
+        pricingTier: pricingTier ?? undefined,
+        tierId: isStage ? undefined : (s.pricingTierId ?? pricingTier?.id ?? undefined),
+        tierName: isStage ? undefined : pricingTier?.name,
+        tierColor: isStage ? undefined : pricingTier?.color,
         totalSeats: isStage ? 0 : s._count.seats,
         availableSeats: isStage ? 0 : s.seats.length,
       };
@@ -87,6 +90,7 @@ export async function getEventById(eventId: string): Promise<EventDTO | null> {
     sections: event.sections.map((s) => {
       const geom = parseGeometry(s.geometry);
       const isStage = s.shapeType === 'STAGE' || geom?.shapeType === 'STAGE';
+      const pricingTier = s.pricingTier || event.layout?.pricingTiers?.find((t) => t.id === s.pricingTierId);
       return {
         id: s.id,
         name: s.name,
@@ -94,10 +98,12 @@ export async function getEventById(eventId: string): Promise<EventDTO | null> {
         shapeType: (isStage ? 'STAGE' : s.shapeType) as SectionDTO['shapeType'],
         geometry: geom,
         price: isStage ? 0 : Number(s.price),
-        color: s.color,
-        tierId: isStage ? undefined : (s.pricingTierId ?? s.pricingTier?.id ?? undefined),
-        tierName: isStage ? undefined : s.pricingTier?.name,
-        tierColor: isStage ? undefined : s.pricingTier?.color,
+        color: isStage ? '#64748B' : (s.color || pricingTier?.color || '#3B82F6'),
+        pricingTierId: isStage ? null : (s.pricingTierId ?? pricingTier?.id ?? null),
+        pricingTier: pricingTier ?? undefined,
+        tierId: isStage ? undefined : (s.pricingTierId ?? pricingTier?.id ?? undefined),
+        tierName: isStage ? undefined : pricingTier?.name,
+        tierColor: isStage ? undefined : pricingTier?.color,
         totalSeats: isStage ? 0 : s._count.seats,
         availableSeats: isStage ? 0 : s.seats.length,
       };

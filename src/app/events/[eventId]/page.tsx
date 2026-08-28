@@ -47,6 +47,7 @@ export default function EventPage() {
 
         // Parse geometry safely if sections are stringified (SQLite compatibility fallback)
         if (rawEvent && Array.isArray(rawEvent.sections)) {
+          const layoutTiers = rawEvent.layout?.pricingTiers || [];
           rawEvent.sections = rawEvent.sections.map((s: any) => {
             let geom = s.geometry;
             if (typeof geom === 'string') {
@@ -61,8 +62,12 @@ export default function EventPage() {
             const total = s.totalSeats !== undefined ? s.totalSeats : (s.seats ? s.seats.length : 0);
             const available = s.availableSeats !== undefined ? s.availableSeats : (s.seats ? s.seats.filter((seat: any) => seat.status === 'AVAILABLE').length : 0);
 
+            // Match section's pricing tier from layout pricingTiers by tierId
+            const tierId = s.pricingTierId || s.tierId;
+            const matchedTier = (tierId ? layoutTiers.find((t: any) => t.id === tierId) : null) || s.pricingTier;
+
             // Derive section price for seat price fallback
-            const sectionPrice = s.price ?? s.pricingTier?.basePrice ?? 0;
+            const sectionPrice = s.price ?? matchedTier?.basePrice ?? 0;
 
             // Transform embedded seats to ensure SeatDTO.price is present
             const transformedSeats = s.seats
@@ -78,22 +83,15 @@ export default function EventPage() {
             const resolvedTierName = isStage
               ? undefined
               : s.tierName ||
-                s.pricingTier?.name ||
-                (s.pricingTierId === 'tier-vip-001' || price >= 120_000 || (price > 0 && price <= 500 && price >= 120)
-                  ? 'VIP Tier'
-                  : s.pricingTierId === 'tier-eco-003' || (price > 0 && price <= 50_000) || (price > 0 && price <= 45)
-                  ? 'Economy Tier'
-                  : 'Standard Tier');
+                matchedTier?.name ||
+                s.name;
 
             const resolvedTierColor = isStage
               ? undefined
               : s.tierColor ||
-                s.pricingTier?.color ||
-                (resolvedTierName === 'VIP Tier'
-                  ? '#EF4444'
-                  : resolvedTierName === 'Economy Tier'
-                  ? '#10B981'
-                  : '#3B82F6');
+                matchedTier?.color ||
+                s.color ||
+                '#3B82F6';
 
             return {
               ...s,
@@ -102,9 +100,11 @@ export default function EventPage() {
               totalSeats: total,
               availableSeats: available,
               seats: transformedSeats,
-              color: s.color || resolvedTierColor || '#3B82F6',
+              color: isStage ? '#64748B' : (s.color || matchedTier?.color || resolvedTierColor || '#3B82F6'),
+              tierId: isStage ? undefined : (tierId || matchedTier?.id),
               tierName: resolvedTierName,
               tierColor: resolvedTierColor,
+              pricingTier: matchedTier,
             };
           });
         }

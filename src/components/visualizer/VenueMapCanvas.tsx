@@ -231,11 +231,7 @@ export function VenueMapCanvas({ event, onSectionSelect, selectedSectionId }: Ve
           const tx = Math.min(tooltip.x + 12, vbW - tipW - 8);
           const ty = Math.max(tooltip.y - tipH - 12, 8);
           const grade = getAvailabilityGrade(s);
-          const tierName = s.tierName || s.pricingTier?.name || (
-            s.price >= 120 ? 'VIP Tier' :
-              s.price <= 45 ? 'Economy Tier' :
-                'Standard Tier'
-          );
+          const tierName = s.tierName || s.pricingTier?.name || undefined;
           return (
             <g
               data-testid="section-tooltip"
