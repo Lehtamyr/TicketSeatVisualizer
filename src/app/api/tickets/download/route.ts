@@ -84,7 +84,13 @@ export async function GET(request: Request) {
       },
     });
   } catch (err: any) {
-    console.error('[api/tickets/download] GET error:', err);
-    return NextResponse.json({ error: 'Failed to generate ticket PDF' }, { status: 500 });
+    console.error('[api/tickets/download] GET error:', err?.message || err, err?.stack);
+    return NextResponse.json(
+      {
+        error: 'Failed to generate ticket PDF',
+        message: process.env.NODE_ENV === 'development' ? err?.message : undefined,
+      },
+      { status: 500 }
+    );
   }
 }

@@ -54,4 +54,34 @@ describe('Ticket PDF Generator', () => {
     const pdfHeader = pdfBuffer.slice(0, 5).toString('utf-8');
     expect(pdfHeader).toBe('%PDF-');
   });
+
+  it('handles lowercase order number and UUID seatId properly for barcode and PDF', async () => {
+    const pdfBuffer = await generateTicketsPdf({
+      orderNumber: 'tsv-2026-lower-case-123',
+      orderDate: new Date('2026-08-28T06:00:00Z'),
+      customerName: 'Test Buyer',
+      customerEmail: 'buyer@example.com',
+      event: {
+        title: 'Festival Musik 2026',
+        venueName: 'GBK Jakarta',
+        startTime: new Date('2026-08-28T19:00:00Z'),
+        termsAndConditions: null,
+      },
+      seats: [
+        {
+          seatId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+          row: 'B',
+          number: 1,
+          sectionName: 'Tribune Left',
+          tierName: 'Reguler',
+          price: 50000,
+        },
+      ],
+    });
+
+    expect(pdfBuffer).toBeDefined();
+    expect(pdfBuffer.length).toBeGreaterThan(1000);
+    const pdfHeader = pdfBuffer.slice(0, 5).toString('utf-8');
+    expect(pdfHeader).toBe('%PDF-');
+  });
 });

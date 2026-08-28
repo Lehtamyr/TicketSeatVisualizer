@@ -167,12 +167,7 @@ export function PaymentInstructionsClient({
       }, 500);
     } catch (err: any) {
       console.error('Download ticket error:', err);
-      // Fallback: Direct window location navigation for mobile / restricted webview environments
-      try {
-        window.location.href = `/api/tickets/download?reservationId=${encodeURIComponent(reservationId)}`;
-      } catch {
-        setDownloadError(err?.message || 'Terjadi gangguan saat mengunduh tiket. Silakan coba lagi.');
-      }
+      setDownloadError(err?.message || 'Terjadi gangguan saat mengunduh tiket. Silakan coba lagi.');
     } finally {
       setIsDownloading(false);
     }

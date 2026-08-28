@@ -95,6 +95,8 @@ export async function generateTicketsPdf(data: TicketPdfData): Promise<Buffer> {
       doc.on('error', (err) => reject(err));
 
       const totalTickets = data.seats.length;
+      const orderDateObj = data.orderDate instanceof Date ? data.orderDate : new Date(data.orderDate);
+      const startTimeObj = data.event.startTime instanceof Date ? data.event.startTime : new Date(data.event.startTime);
 
       // Find poster image path
       const posterPath1 = path.join(process.cwd(), 'public', 'img', 'Home sweet Loan Poster.jpeg');
@@ -103,7 +105,9 @@ export async function generateTicketsPdf(data: TicketPdfData): Promise<Buffer> {
       for (let i = 0; i < totalTickets; i++) {
         const seat = data.seats[i];
         const ticketSeq = `TICKET ${i + 1} of ${totalTickets}`;
-        const barcodeVal = `${data.orderNumber.replace(/[^0-9A-Z]/g, '')}${seat.seatId.replace(/[^0-9A-Z]/g, '').slice(0, 6)}`;
+        const cleanOrderNumber = (data.orderNumber || '').toUpperCase().replace(/[^0-9A-Z]/g, '');
+        const cleanSeatId = (seat.seatId || '').toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 6);
+        const barcodeVal = `${cleanOrderNumber}${cleanSeatId}` || 'TICKET';
         const barcodeBuffer = await generateTicketBarcodeBuffer(barcodeVal);
 
         if (i > 0) {
@@ -183,7 +187,8 @@ export async function generateTicketsPdf(data: TicketPdfData): Promise<Buffer> {
 
         // Barcode Image
         try {
-          doc.image(barcodeBuffer, rightX + (colWidth - 200) / 2, curY + 42, {
+          const barcodeDataUrl = `data:image/png;base64,${barcodeBuffer.toString('base64')}`;
+          doc.image(barcodeDataUrl, rightX + (colWidth - 200) / 2, curY + 42, {
             width: 200,
             height: 58,
           });
@@ -213,11 +218,11 @@ export async function generateTicketsPdf(data: TicketPdfData): Promise<Buffer> {
           .font('Helvetica')
           .fontSize(7.5)
           .text(
-            `${data.event.startTime.toLocaleDateString('id-ID', {
+            `${startTimeObj.toLocaleDateString('id-ID', {
               day: '2-digit',
               month: 'long',
               year: 'numeric',
-            }).toUpperCase()} ${data.event.startTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} - SELESAI`,
+            }).toUpperCase()} ${startTimeObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} - SELESAI`,
             startX + 10,
             curY + 26
           )
@@ -237,7 +242,7 @@ export async function generateTicketsPdf(data: TicketPdfData): Promise<Buffer> {
           .fontSize(7)
           .fillColor('#64748B')
           .text(
-            `Ordered on : ${data.orderDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}`,
+            `Ordered on : ${orderDateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}`,
             rightX + 10,
             curY + 44,
             { align: 'center', width: colWidth - 20 }

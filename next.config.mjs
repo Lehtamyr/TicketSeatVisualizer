@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  serverExternalPackages: ['pdfkit', 'bwip-js'],
+  outputFileTracingIncludes: {
+    '/api/**/*': ['./public/**/*'],
+  },
   reactStrictMode: true,
   async headers() {
     const isProd = process.env.NODE_ENV === 'production';

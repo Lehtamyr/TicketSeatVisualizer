@@ -24,8 +24,8 @@ test.describe('Checkout Process Flow - Input Validation & Edge Case E2E Tests', 
     await page.fill('input[placeholder="81234567890"]', '');
 
     // Uncheck terms if any
-    const termsCheckbox = page.locator('input[type="checkbox"]').nth(1);
-    const privacyCheckbox = page.locator('input[type="checkbox"]').nth(2);
+    const termsCheckbox = page.locator('input[type="checkbox"]').nth(0);
+    const privacyCheckbox = page.locator('input[type="checkbox"]').nth(1);
 
     if (await termsCheckbox.isChecked()) await termsCheckbox.uncheck();
     if (await privacyCheckbox.isChecked()) await privacyCheckbox.uncheck();
