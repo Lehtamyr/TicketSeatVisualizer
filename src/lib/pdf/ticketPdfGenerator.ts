@@ -151,6 +151,7 @@ export async function generateTicketsPdf(data: TicketPdfData): Promise<Buffer> {
         const colWidth = (pageWidth - 12) / 2;
 
         // Left: Poster / Event Banner
+        let imageEmbedded = false;
         if (hasPoster) {
           try {
             doc.image(posterPath1, startX, curY, {
@@ -158,12 +159,13 @@ export async function generateTicketsPdf(data: TicketPdfData): Promise<Buffer> {
               align: 'center',
               valign: 'center',
             });
-          } catch {
-            // Fallback banner placeholder
-            doc.rect(startX, curY, colWidth, bannerBoxHeight).fill('#1E293B');
-            doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(11).text(data.event.title, startX + 10, curY + 50, { width: colWidth - 20, align: 'center' });
+            imageEmbedded = true;
+          } catch (err) {
+            console.warn('PDF poster embed error:', err);
           }
-        } else {
+        }
+        
+        if (!imageEmbedded) {
           doc.rect(startX, curY, colWidth, bannerBoxHeight).fill('#1E293B');
           doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(11).text(data.event.title, startX + 10, curY + 50, { width: colWidth - 20, align: 'center' });
         }

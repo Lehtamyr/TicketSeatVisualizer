@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { generateTicketsPdf } from '@/lib/pdf/ticketPdfGenerator';
 
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+export const maxDuration = 30;
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -68,12 +72,15 @@ export async function GET(request: Request) {
       seats,
     });
 
-    return new NextResponse(new Uint8Array(pdfBuffer), {
+    const pdfUint8Array = new Uint8Array(pdfBuffer);
+
+    return new NextResponse(pdfUint8Array, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="E-Ticket-${orderNumber}.pdf"`,
-        'Cache-Control': 'no-store, must-revalidate',
+        'Content-Length': String(pdfUint8Array.byteLength),
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
       },
     });
   } catch (err: any) {

@@ -72,16 +72,39 @@ export default function EventPage() {
               }))
               : undefined;
 
+            const isStage = s.shapeType === 'STAGE' || geom?.shapeType === 'STAGE';
+            const price = isStage ? 0 : Number(sectionPrice);
+
+            const resolvedTierName = isStage
+              ? undefined
+              : s.tierName ||
+                s.pricingTier?.name ||
+                (s.pricingTierId === 'tier-vip-001' || price >= 120_000 || (price > 0 && price <= 500 && price >= 120)
+                  ? 'VIP Tier'
+                  : s.pricingTierId === 'tier-eco-003' || (price > 0 && price <= 50_000) || (price > 0 && price <= 45)
+                  ? 'Economy Tier'
+                  : 'Standard Tier');
+
+            const resolvedTierColor = isStage
+              ? undefined
+              : s.tierColor ||
+                s.pricingTier?.color ||
+                (resolvedTierName === 'VIP Tier'
+                  ? '#EF4444'
+                  : resolvedTierName === 'Economy Tier'
+                  ? '#10B981'
+                  : '#3B82F6');
+
             return {
               ...s,
               geometry: geom,
+              price,
               totalSeats: total,
               availableSeats: available,
               seats: transformedSeats,
-              // Fallbacks for pricing tier color-coding verification
-              color: s.color || s.pricingTier?.color || (s.pricingTierId === 'tier-vip-001' ? '#EF4444' : s.pricingTierId === 'tier-std-002' ? '#3B82F6' : s.pricingTierId === 'tier-eco-003' ? '#10B981' : '#3B82F6'),
-              tierName: s.tierName || s.pricingTier?.name || (s.pricingTierId === 'tier-vip-001' ? 'VIP Tier' : s.pricingTierId === 'tier-std-002' ? 'Standard Tier' : s.pricingTierId === 'tier-eco-003' ? 'Economy Tier' : undefined),
-              tierColor: s.tierColor || s.pricingTier?.color || (s.pricingTierId === 'tier-vip-001' ? '#EF4444' : s.pricingTierId === 'tier-std-002' ? '#3B82F6' : s.pricingTierId === 'tier-eco-003' ? '#10B981' : undefined),
+              color: s.color || resolvedTierColor || '#3B82F6',
+              tierName: resolvedTierName,
+              tierColor: resolvedTierColor,
             };
           });
         }

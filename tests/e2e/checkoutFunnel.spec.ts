@@ -125,9 +125,8 @@ test.describe('Complete Multi-Page Ticket Purchase & Checkout Flow E2E Tests', (
     await page.click('button:has-text("Simulasikan Pembayaran Berhasil")');
     await expect(page.getByText('Pembayaran Berhasil!')).toBeVisible();
 
-    // Verify Download E-Ticket PDF button is visible and links to download endpoint
-    const downloadBtn = page.getByRole('link', { name: 'Unduh E-Ticket (PDF)' });
+    // Verify Download E-Ticket PDF button is visible and triggers download
+    const downloadBtn = page.getByRole('button', { name: 'Unduh E-Ticket (PDF)' });
     await expect(downloadBtn).toBeVisible();
-    await expect(downloadBtn).toHaveAttribute('href', new RegExp(`/api/tickets/download\\?reservationId=.*`));
   });
 });

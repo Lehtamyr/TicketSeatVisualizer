@@ -56,6 +56,8 @@ export function PaymentInstructionsClient({
   const [buyerInfo] = useState(() => getStoredBuyerInfo());
   const [isCopied, setIsCopied] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
@@ -130,6 +132,33 @@ export function PaymentInstructionsClient({
       setPaymentError(err.message || 'Terjadi kesalahan saat memverifikasi pembayaran.');
     } finally {
       setIsSimulating(false);
+    }
+  };
+
+  const handleDownloadTicket = async () => {
+    setIsDownloading(true);
+    setDownloadError(null);
+
+    try {
+      const response = await fetch(`/api/tickets/download?reservationId=${encodeURIComponent(reservationId)}`);
+      if (!response.ok) {
+        throw new Error('Gagal mengunduh file tiket dari server.');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `E-Ticket-${reservationId.slice(0, 8).toUpperCase()}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err: any) {
+      console.error('Download ticket error:', err);
+      setDownloadError(err?.message || 'Terjadi gangguan saat mengunduh tiket. Silakan coba lagi.');
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -439,15 +468,31 @@ export function PaymentInstructionsClient({
             </div>
 
             <div className="flex flex-col gap-2.5">
+              {downloadError && (
+                <div className="p-2.5 bg-red-50 border border-red-200 rounded-xl text-[11px] text-red-600 font-medium">
+                  {downloadError}
+                </div>
+              )}
+
               {/* Primary Action: Download E-Ticket PDF */}
-              <a
-                href={`/api/tickets/download?reservationId=${reservationId}`}
-                download={`E-Ticket-${reservationId.slice(0, 8).toUpperCase()}.pdf`}
-                className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
+              <button
+                type="button"
+                onClick={handleDownloadTicket}
+                disabled={isDownloading}
+                className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-800 disabled:opacity-75 text-white font-bold text-xs shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
               >
-                <FileDown size={16} />
-                <span>Unduh E-Ticket (PDF)</span>
-              </a>
+                {isDownloading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Sedang Menyiapkan E-Ticket...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileDown size={16} />
+                    <span>Unduh E-Ticket (PDF)</span>
+                  </>
+                )}
+              </button>
 
               <button
                 type="button"

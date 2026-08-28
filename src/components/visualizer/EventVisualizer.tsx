@@ -373,7 +373,7 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
       .filter((t: any) => usedTierIds.has(t.id) || usedTierNames.has(t.name))
       .map((t: any) => ({ ...t }));
 
-    // Group remaining sections without formal tiers by distinct price
+    // Group remaining sections without formal tiers by distinct price or derived tierName
     if (sectionsWithoutFormalTier.length > 0) {
       const priceGroups = new Map<number, typeof nonStageSections>();
       sectionsWithoutFormalTier.forEach((sec) => {
@@ -384,11 +384,27 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
 
       priceGroups.forEach((secs, price) => {
         const sample = secs[0];
-        const name = sample.tierName || `${sample.name || 'Standard'} Tier`;
+        const name =
+          sample.tierName ||
+          (price >= 120_000 || (price > 0 && price <= 500 && price >= 120)
+            ? 'VIP Tier'
+            : price <= 50_000 || (price > 0 && price <= 45)
+            ? 'Economy Tier'
+            : 'Standard Tier');
+
+        const color =
+          sample.tierColor ||
+          sample.color ||
+          (name === 'VIP Tier'
+            ? '#EF4444'
+            : name === 'Economy Tier'
+            ? '#10B981'
+            : '#3B82F6');
+
         inUseTiers.push({
           id: sample.tierId || (sample as any).pricingTierId || `tier-fallback-${price}`,
           name: name,
-          color: sample.tierColor || sample.color || 'var(--accent-primary)',
+          color: color,
           basePrice: price,
           description: `Seating covering the ${name} areas.`,
         });
@@ -528,15 +544,12 @@ export function EventVisualizer({ event }: EventVisualizerProps) {
               <div className="flex flex-col gap-4">
                 {activeTiers.map((tier: any) => {
                   const matchingSections = event.sections.filter(sec => {
-                    if (sec.shapeType === 'STAGE') return false;
-                    if (event.layout?.pricingTiers && event.layout.pricingTiers.length > 0) {
-                      if (tier.id === 'tier-economy-fallback') {
-                         return !event.layout.pricingTiers.find((t: any) => t.id === sec.tierId || t.name === sec.tierName);
-                      }
-                      return sec.tierId === tier.id || sec.tierName === tier.name;
-                    } else {
-                      return sec.price === tier.basePrice;
-                    }
+                    if (sec.shapeType === 'STAGE' || sec.geometry?.shapeType === 'STAGE') return false;
+                    if (sec.tierId && sec.tierId === tier.id) return true;
+                    if (sec.tierName && sec.tierName === tier.name) return true;
+                    if (tier.id === `tier-fallback-${sec.price}`) return true;
+                    if (sec.price === tier.basePrice) return true;
+                    return false;
                   });
                   const sectionNames = Array.from(new Set(matchingSections.map(s => s.name))).join(', ');
                   
