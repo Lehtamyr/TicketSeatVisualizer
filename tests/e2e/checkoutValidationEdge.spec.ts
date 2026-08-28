@@ -8,7 +8,7 @@ test.describe('Checkout Process Flow - Input Validation & Edge Case E2E Tests', 
   test.beforeEach(async ({}, testInfo) => {
     // Seed fresh test event and unique test-isolated pending reservation in PostgreSQL
     const cleanTestTitle = testInfo.title.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10).toLowerCase();
-    activeReservationId = `res-e2e-e-${testInfo.workerIndex}-${cleanTestTitle}`;
+    activeReservationId = `res-e2e-e-${testInfo.workerIndex}-${cleanTestTitle}-${Date.now().toString(36)}`;
     await ensureE2eTestData(activeReservationId);
   });
 

@@ -7,7 +7,7 @@ test.describe('Complete Multi-Page Ticket Purchase & Checkout Flow E2E Tests', (
   test.beforeEach(async ({}, testInfo) => {
     // Seed fresh test event and unique test-isolated pending reservation in PostgreSQL
     const cleanTestTitle = testInfo.title.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10).toLowerCase();
-    activeReservationId = `res-e2e-f-${testInfo.workerIndex}-${cleanTestTitle}`;
+    activeReservationId = `res-e2e-f-${testInfo.workerIndex}-${cleanTestTitle}-${Date.now().toString(36)}`;
     await ensureE2eTestData(activeReservationId);
   });
 

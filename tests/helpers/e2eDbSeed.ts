@@ -107,28 +107,41 @@ export async function ensureE2eTestData(targetReservationId = 'res-e2e-active-00
     if (!event) return;
 
     // Ensure a designated isolated seat exists specifically for this reservation
-    const cleanId = targetReservationId.replace(/[^a-zA-Z0-9]/g, '');
+    const cleanId = targetReservationId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 25);
     const isolatedSeatId = `seat-${cleanId}`;
-    let targetSection = event.sections[0] || (await prisma.section.findFirst({ where: { eventId: event.id } }));
+    let targetSection = event.sections?.[0] || (await prisma.section.findFirst({ where: { eventId: event.id } }));
 
+    if (!targetSection) {
+      targetSection = await prisma.section.findFirst();
+    }
     if (!targetSection) return;
 
+    // Clean up any stale records belonging to this target reservation or seat
+    await prisma.order.deleteMany({
+      where: { reservationId: targetReservationId },
+    }).catch(() => {});
+    await prisma.reservationSeat.deleteMany({
+      where: { OR: [{ reservationId: targetReservationId }, { seatId: isolatedSeatId }] },
+    }).catch(() => {});
+    await prisma.reservation.deleteMany({
+      where: { id: targetReservationId },
+    }).catch(() => {});
+
+    // Upsert the isolated seat for this reservation
     let testSeat = await prisma.seat.findUnique({
       where: { id: isolatedSeatId },
     });
 
     if (!testSeat) {
-      const seatNum = Math.abs(cleanId.split('').reduce((acc, c) => acc * 31 + c.charCodeAt(0), 0) % 8000) + 100;
-      testSeat = await prisma.seat.upsert({
-        where: {
-          sectionId_row_number: {
-            sectionId: targetSection.id,
-            row: 'Z',
-            number: seatNum,
-          },
-        },
-        update: {},
-        create: {
+      // Find an unused seat number in section
+      const maxSeat = await prisma.seat.findFirst({
+        where: { sectionId: targetSection.id },
+        orderBy: { number: 'desc' },
+      });
+      const seatNum = (maxSeat?.number || 1000) + Math.floor(Math.random() * 500) + 1;
+
+      testSeat = await prisma.seat.create({
+        data: {
           id: isolatedSeatId,
           sectionId: targetSection.id,
           row: 'Z',
@@ -137,38 +150,60 @@ export async function ensureE2eTestData(targetReservationId = 'res-e2e-active-00
           y: 200,
           status: 'AVAILABLE',
         },
+      }).catch(async () => {
+        // If seat creation had conflict on (sectionId, row, number), generate a random high number
+        return await prisma.seat.create({
+          data: {
+            id: isolatedSeatId,
+            sectionId: targetSection.id,
+            row: `Z${Math.floor(Math.random() * 90) + 10}`,
+            number: Math.floor(Math.random() * 90000) + 10000,
+            x: 200,
+            y: 200,
+            status: 'AVAILABLE',
+          },
+        });
       });
+    } else {
+      // Reset seat status to AVAILABLE
+      await prisma.seat.update({
+        where: { id: isolatedSeatId },
+        data: { status: 'AVAILABLE', heldBy: null },
+      }).catch(() => {});
     }
 
-    // Clean up only records belonging to this target reservation
-    await prisma.reservationSeat.deleteMany({
-      where: { reservationId: targetReservationId },
-    });
-    await prisma.order.deleteMany({
-      where: { reservationId: targetReservationId },
-    });
-    await prisma.reservation.deleteMany({
-      where: { id: targetReservationId },
-    });
-
-    await prisma.reservation.create({
-      data: {
-        id: targetReservationId,
-        eventId: event.id,
-        userSessionId: `sess-${targetReservationId}`,
-        status: 'PENDING',
-        totalAmount: 150000,
-        expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 mins
-        seats: {
-          create: [
-            {
-              seatId: testSeat.id,
-              priceLocked: 150000,
+    // Create fresh reservation with retry
+    let created = false;
+    for (let rAttempt = 0; rAttempt < 3; rAttempt++) {
+      try {
+        await prisma.reservation.create({
+          data: {
+            id: targetReservationId,
+            eventId: event.id,
+            userSessionId: `sess-${targetReservationId}`,
+            status: 'PENDING',
+            totalAmount: 150000,
+            expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 60 mins
+            seats: {
+              create: [
+                {
+                  seatId: testSeat.id,
+                  priceLocked: 150000,
+                },
+              ],
             },
-          ],
-        },
-      },
-    });
+          },
+        });
+        created = true;
+        break;
+      } catch (rErr) {
+        await new Promise((res) => setTimeout(res, 500));
+      }
+    }
+
+    if (!created) {
+      console.warn(`[ensureE2eTestData] Failed to create reservation ${targetReservationId} after retries`);
+    }
   } catch (err: any) {
     console.warn('[ensureE2eTestData] Test data setup warning:', err?.message || err);
   }
