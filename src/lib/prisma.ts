@@ -1,12 +1,6 @@
 import { PrismaClient } from '@prisma/client';
-import { neonConfig } from '@neondatabase/serverless';
-import { PrismaNeon } from '@prisma/adapter-neon';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
-import ws from 'ws';
-
-// Configure WebSocket constructor globally on neonConfig
-neonConfig.webSocketConstructor = ws;
 
 function createPrismaClient(): PrismaClient {
   const connectionString = process.env.DATABASE_URL || '';
@@ -15,29 +9,27 @@ function createPrismaClient(): PrismaClient {
     console.warn('[Prisma] WARNING: DATABASE_URL is not defined in environment.');
   }
 
-  // If connecting to Neon serverless database, connect via Neon WebSocket Driver Adapter
-  // This enables instant connection pooling, full transaction support ($transaction),
-  // and communicates over Port 443 (WebSocket) to bypass port 5432 TCP resets.
-  if (connectionString.includes('neon.tech')) {
-    const adapter = new PrismaNeon({ connectionString });
-    return new PrismaClient({
-      adapter,
-      log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-    });
-  }
-
-  // Standard PostgreSQL connection fallback for local / non-Neon databases
+  // Connect via standard PostgreSQL connection pool with TCP keep-alive
+  // This maintains active connections, prevents idle timeouts, and works seamlessly with Neon poolers
   if (connectionString) {
-    const pool = new Pool({ connectionString });
+    const pool = new Pool({
+      connectionString,
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 15000,
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10000,
+      ssl: connectionString.includes('neon.tech') ? { rejectUnauthorized: false } : undefined,
+    });
     const adapter = new PrismaPg(pool);
     return new PrismaClient({
       adapter,
-      log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+      log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
     });
   }
 
   return new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
   });
 }
 

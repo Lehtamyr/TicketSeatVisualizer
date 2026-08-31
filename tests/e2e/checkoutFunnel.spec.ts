@@ -89,7 +89,9 @@ test.describe('Complete Multi-Page Ticket Purchase & Checkout Flow E2E Tests', (
   test('QRIS Payment Flow: validates dynamic QR code and instructions', async ({ page }) => {
     // Navigate to step 2A to establish cookies and valid session context
     await page.goto(`/events/event-concert-1/checkout?reservationId=${activeReservationId}`);
-    await page.fill('input[placeholder="Contoh: John"]', 'Ahmad');
+    const firstNameInput = page.locator('input[placeholder="Contoh: John"]');
+    await expect(firstNameInput).toBeVisible();
+    await firstNameInput.fill('Ahmad');
     await page.fill('input[placeholder="Contoh: Doe"]', 'Dahlan');
     await page.fill('input[placeholder="nama@email.com"]', 'ahmad.dahlan@example.com');
     await page.fill('input[placeholder="3171xxxxxxxxxxxx"]', '3171012345678901');

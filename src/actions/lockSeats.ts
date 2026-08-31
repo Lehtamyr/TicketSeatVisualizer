@@ -203,9 +203,9 @@ export async function lockSeatsAction(input: LockSeatsInput): Promise<LockSeatsR
   // Always sort seat IDs deterministically to prevent PostgreSQL deadlocks (40P01)
   const sortedSeatIds = Array.from(new Set(seatIds)).sort();
 
-  // Retry up to 2 times on transient PostgreSQL deadlocks
+  // Retry up to 3 times on transient PostgreSQL deadlocks or connection timeouts
   let attempts = 0;
-  while (attempts < 2) {
+  while (attempts < 3) {
     attempts++;
     try {
       const result = await executeLockTransaction(eventId, sortedSeatIds, userSessionId);
@@ -232,16 +232,21 @@ export async function lockSeatsAction(input: LockSeatsInput): Promise<LockSeatsR
         expiresAt: result.expiresAt.toISOString(),
       };
     } catch (err: unknown) {
+      if (err instanceof SeatUnavailableError) {
+        return { success: false, error: err.message, unavailableIds: err.unavailableIds };
+      }
+
       const isDeadlock = err instanceof Error && (err.message.includes('40P01') || err.message.includes('deadlock'));
-      if (isDeadlock && attempts < 2) {
+      const isTransient = isDeadlock || (err instanceof Error && (err.message.includes('connection') || err.message.includes('timeout') || err.message.includes('ETIMEDOUT') || err.message.includes('P2024') || err.message.includes('P2028') || err.message.includes('closed')));
+
+      if (isTransient && attempts < 3) {
         // Exponential backoff retry
-        await new Promise((r) => setTimeout(r, 60 * attempts));
+        await new Promise((r) => setTimeout(r, 100 * attempts));
         continue;
       }
 
       const message = err instanceof Error ? err.message : 'Failed to lock seats.';
-      const unavailableIds = err instanceof SeatUnavailableError ? err.unavailableIds : [];
-      return { success: false, error: message, unavailableIds };
+      return { success: false, error: message, unavailableIds: [] };
     }
   }
 

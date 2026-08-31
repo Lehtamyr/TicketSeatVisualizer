@@ -110,7 +110,7 @@ async function syncPricingTiers(
       : [];
     const existingTierMap = new Map(existingTiers.map((t) => [t.id, t]));
 
-    for (const t of pricingTiers) {
+    const upsertPromises = pricingTiers.map((t) => {
       const cleanName = (t.name || 'Untitled Tier').trim().slice(0, 100);
       const cleanColor = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(t.color) ? t.color : '#6366f1';
       const cleanBasePrice = Math.max(0, Math.floor(Number(t.basePrice) || 0));
@@ -141,7 +141,7 @@ async function syncPricingTiers(
       validTierIds.add(targetId);
       incomingTierIds.push(targetId);
 
-      await tx.pricingTier.upsert({
+      return tx.pricingTier.upsert({
         where: { id: targetId },
         create: {
           id: targetId,
@@ -161,7 +161,9 @@ async function syncPricingTiers(
           salesEndDate: cleanSalesEndDate,
         },
       });
-    }
+    });
+
+    await Promise.all(upsertPromises);
 
     if (isUpdate) {
       await tx.pricingTier.deleteMany({
@@ -183,6 +185,7 @@ async function syncPricingTiers(
 
 /**
  * Re-creates sections and their associated seats for the layout.
+ * Optimizes performance by parallelizing section creations and bulk inserting all seats in a single query.
  */
 async function createSectionsAndSeats(
   tx: TransactionClient,
@@ -192,7 +195,8 @@ async function createSectionsAndSeats(
 ) {
   const { tierIdMap, validTierIds } = tierContext;
 
-  for (const sec of sections) {
+  // 1. Create all sections in parallel
+  const sectionCreatePromises = sections.map((sec) => {
     const isStage = sec.shapeType === 'STAGE';
     const dbShapeType = sec.shapeType;
     const geomToSave = JSON.stringify({
@@ -219,48 +223,66 @@ async function createSectionsAndSeats(
       const mappedId = tierIdMap[incomingTierId] || incomingTierId;
       if (validTierIds.has(mappedId)) {
         resolvedPricingTierId = mappedId;
-      } else {
-        const dbTier = await tx.pricingTier.findFirst({
-          where: {
-            id: mappedId,
-            layoutId: layoutId,
-          },
-        });
-        if (dbTier) {
-          resolvedPricingTierId = dbTier.id;
-          validTierIds.add(dbTier.id);
-        }
       }
     }
 
-    const section = await tx.section.create({
-      data: {
-        layoutId,
-        name: sec.name,
-        code: sec.code,
-        shapeType: dbShapeType as 'RECTANGLE' | 'SQUARE' | 'TRIANGLE' | 'POLYGON' | 'CIRCLE' | 'STAGE',
-        geometry: geomToSave,
-        pricingTierId: resolvedPricingTierId,
-        price: isStage ? 0 : sec.price ?? 0,
-        color: sec.color,
-        rowCount: isStage ? 0 : sec.rowCount ?? 0,
-        seatsPerRow: isStage ? 0 : sec.seatsPerRow ?? 0,
-      },
-    });
+    return tx.section
+      .create({
+        data: {
+          layoutId,
+          name: sec.name,
+          code: sec.code,
+          shapeType: dbShapeType as 'RECTANGLE' | 'SQUARE' | 'TRIANGLE' | 'POLYGON' | 'CIRCLE' | 'STAGE',
+          geometry: geomToSave,
+          pricingTierId: resolvedPricingTierId,
+          price: isStage ? 0 : sec.price ?? 0,
+          color: sec.color,
+          rowCount: isStage ? 0 : sec.rowCount ?? 0,
+          seatsPerRow: isStage ? 0 : sec.seatsPerRow ?? 0,
+        },
+      })
+      .then((createdSec) => ({
+        createdSec,
+        sec,
+        resolvedPricingTierId,
+      }));
+  });
 
+  const createdSections = await Promise.all(sectionCreatePromises);
+
+  // 2. Aggregate all seats across all sections into one single bulk array
+  const allSeatsToCreate: Array<{
+    sectionId: string;
+    row: string;
+    number: number;
+    x: number;
+    y: number;
+    status: 'AVAILABLE';
+    pricingTierId: string | null;
+  }> = [];
+
+  for (const { createdSec, sec, resolvedPricingTierId } of createdSections) {
+    const isStage = sec.shapeType === 'STAGE';
     if (!isStage && sec.seatsToCreate && sec.seatsToCreate.length > 0) {
-      await tx.seat.createMany({
-        data: sec.seatsToCreate.map((s) => ({
-          sectionId: section.id,
+      for (const s of sec.seatsToCreate) {
+        allSeatsToCreate.push({
+          sectionId: createdSec.id,
           row: s.row,
           number: s.number,
           x: s.x,
           y: s.y,
-          status: 'AVAILABLE' as const,
+          status: 'AVAILABLE',
           pricingTierId: resolvedPricingTierId,
-        })),
-      });
+        });
+      }
     }
+  }
+
+  // 3. Insert all seats in 1 single bulk database query
+  if (allSeatsToCreate.length > 0) {
+    await tx.seat.createMany({
+      data: allSeatsToCreate,
+    });
   }
 }
 
@@ -274,36 +296,51 @@ export async function saveLayoutAction(
     }
 
     const processedSections = preprocessSections(input.sections);
+    const maxAttempts = 3;
+    let lastError: unknown;
 
-    const layoutId = await prisma.$transaction(
-      async (tx) => {
-        const layout = await upsertVenueLayout(tx, {
-          layoutId: input.layoutId,
-          name: input.name,
-          canvasWidth: input.canvasWidth,
-          canvasHeight: input.canvasHeight,
-        });
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const layoutId = await prisma.$transaction(
+          async (tx) => {
+            const layout = await upsertVenueLayout(tx, {
+              layoutId: input.layoutId,
+              name: input.name,
+              canvasWidth: input.canvasWidth,
+              canvasHeight: input.canvasHeight,
+            });
 
-        const tierContext = await syncPricingTiers(
-          tx,
-          layout.id,
-          input.pricingTiers,
-          Boolean(input.layoutId)
+            const tierContext = await syncPricingTiers(
+              tx,
+              layout.id,
+              input.pricingTiers,
+              Boolean(input.layoutId)
+            );
+
+            await createSectionsAndSeats(tx, layout.id, processedSections, tierContext);
+
+            return layout.id;
+          },
+          {
+            maxWait: 15000,
+            timeout: 45000,
+          }
         );
 
-        await createSectionsAndSeats(tx, layout.id, processedSections, tierContext);
-
-        return layout.id;
-      },
-      {
-        maxWait: 10000,
-        timeout: 30000,
+        return { success: true, layoutId };
+      } catch (err: unknown) {
+        lastError = err;
+        console.warn(`[saveLayoutAction] Transaction attempt ${attempt}/${maxAttempts} failed:`, err);
+        if (attempt < maxAttempts) {
+          // Exponential backoff retry: 200ms, 400ms
+          await new Promise((r) => setTimeout(r, 200 * attempt));
+        }
       }
-    );
+    }
 
-    return { success: true, layoutId };
+    throw lastError;
   } catch (err: unknown) {
-    console.error('[saveLayoutAction] Failed to save layout:', err);
+    console.error('[saveLayoutAction] Failed to save layout after retries:', err);
     return { success: false, error: err instanceof Error ? err.message : 'Failed to save layout.' };
   }
 }
